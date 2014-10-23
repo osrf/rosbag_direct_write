@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>rosbag_direct_write</name>
+  <version>0.0.0</version>
+  <description>
+    C++ API for (potentially) faster writing of rosbag's using O_DIRECT or F_NOCACHE with memory alignment.
+  </description>
+
+  <maintainer email="william@osrfoundation.org">William Woodall</maintainer>
+
+  <license>Apache 2.0</license>
+
+  <url type="repository">https://github.com/osrf/rosbag_direct_write</url>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <build_export_depend>rosbag_storage</build_export_depend>
+
+</package>
