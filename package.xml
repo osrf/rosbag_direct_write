@@ -14,6 +14,7 @@
 
   <buildtool_depend>catkin</buildtool_depend>
 
+  <build_depend>rosbag_storage</build_depend>
   <build_export_depend>rosbag_storage</build_export_depend>
 
 </package>
