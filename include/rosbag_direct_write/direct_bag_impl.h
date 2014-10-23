@@ -19,11 +19,14 @@
 #include <fcntl.h>
 
 #include <ros/console.h>
+#include <rosbag/stream.h>  // For CompressionType Enum
 
 #include "direct_bag.h"
 
 namespace rosbag_direct_write
 {
+
+using rosbag::compression::CompressionType;
 
 namespace impl
 {
@@ -253,7 +256,7 @@ bool DirectBag::is_open() const
 
 inline size_t
 write_chunk_header(VectorBuffer &buffer,
-                   rosbag::CompressionType compression,
+                   CompressionType compression,
                    uint32_t compressed_size,
                    uint32_t uncompressed_size)
 {
@@ -382,9 +385,11 @@ DirectBag::get_connection_info(std::string const &topic,
     connection_info.reset(new rosbag::ConnectionInfo());
     connection_info->id       = conn_id;
     connection_info->topic    = topic;
-    connection_info->datatype = string(ros::message_traits::datatype(msg));
-    connection_info->md5sum   = string(ros::message_traits::md5sum(msg));
-    connection_info->msg_def  = string(ros::message_traits::definition(msg));
+    connection_info->datatype = \
+      std::string(ros::message_traits::datatype(msg));
+    connection_info->md5sum   = std::string(ros::message_traits::md5sum(msg));
+    connection_info->msg_def  = \
+      std::string(ros::message_traits::definition(msg));
     if (connection_header != nullptr)
     {
       connection_info->header = connection_header;
@@ -517,7 +522,7 @@ DirectBag::write(std::string const& topic, ros::Time const& time, T const& msg,
   chunk_info.end_time   = time;
   // This is a place holder, later we'll create the real one and replace it
   size_t chunk_header_len = write_chunk_header(
-    chunk_buffer_, rosbag::CompressionType::Uncompressed, 0, 0);
+    chunk_buffer_, CompressionType::Uncompressed, 0, 0);
 
   // Get ID for connection header
   auto connection_info = \
@@ -595,7 +600,7 @@ DirectBag::write(std::string const& topic, ros::Time const& time, T const& msg,
   // Then replace the place-holder chunk header
   VectorBuffer header_buffer;
   write_chunk_header(header_buffer,
-                     rosbag::CompressionType::Uncompressed,
+                     CompressionType::Uncompressed,
                      chunk_size,
                      chunk_size);
   std::copy(header_buffer.begin(), header_buffer.end(),
