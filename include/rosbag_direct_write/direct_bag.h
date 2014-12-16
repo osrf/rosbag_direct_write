@@ -16,25 +16,24 @@
 #ifndef ROSBAG_BAG_DIRECT_H
 #define ROSBAG_BAG_DIRECT_H
 
-#include <boost/shared_array.hpp>
-#include <ros/header.h>
-#include <ros/message_traits.h>
-#include <ros/serialization.h>
-#include <rosbag/constants.h>
-#include <rosbag/exceptions.h>
-#include <rosbag/structures.h>
+#include <memory>
+#include <rosbag_direct_write/direct_bag_dependencies.h>
 
 namespace rosbag_direct_write
 {
 
-using boost::shared_ptr;
+#include "aligned_allocator.h"
 
-typedef std::vector<uint8_t> VectorBuffer;
+// Defined in dependencies header and is either shared_ptr from boost or std
+using rosbag_direct_write::shared_ptr;
 
-class ROSBAG_DECL DirectFile
+typedef std::vector<uint8_t, aligned_allocator<uint8_t, 4096>> VectorBuffer;
+
+class ROSBAG_DIRECT_WRITE_DECL DirectFile
 {
 public:
   DirectFile(std::string filename);
+  ~DirectFile();
 
   size_t get_offset() const;
   void seek(uint64_t pos) const;
@@ -46,16 +45,22 @@ public:
 
 private:
   std::string filename_;
+#if __APPLE__
   FILE *file_pointer_;
-
+#else
+  int file_descriptor_;
+#endif
 };
 
-class ROSBAG_DECL DirectBag
+class ROSBAG_DIRECT_WRITE_DECL DirectBag
 {
 public:
   DirectBag(std::string filename);
+  DirectBag();
 
   ~DirectBag();
+
+  void open(std::string filename, rosbag::bagmode::BagMode mode);
 
   template<class T>
   void write(std::string const& topic,
@@ -113,6 +118,7 @@ private:
 
   VectorBuffer chunk_buffer_;
 
+  uint32_t next_conn_id_;
 };
 
 } // namespace rosbag_direct_write
