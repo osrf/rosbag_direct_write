@@ -13,8 +13,8 @@
  * limitations under the License.
  */
 
-#ifndef ROSBAG_BAG_DIRECT_H
-#define ROSBAG_BAG_DIRECT_H
+#ifndef ROSBAG_BAG_DIRECT_BAG_DIRECT_H
+#define ROSBAG_BAG_DIRECT_BAG_DIRECT_H
 
 #include <memory>
 #include <rosbag_direct_write/direct_bag_dependencies.h>
@@ -125,4 +125,4 @@ private:
 
 #include "direct_bag_impl.h"
 
-#endif
+#endif  /* ROSBAG_BAG_DIRECT_BAG_DIRECT_H */

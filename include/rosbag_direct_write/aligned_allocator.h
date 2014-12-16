@@ -18,8 +18,8 @@
  * Boost Align License: http://boost.org/LICENSE_1_0.txt
  */
 
-#ifndef ALIGNED_ALLOCATOR_H
-#define ALIGNED_ALLOCATOR_H
+#ifndef ROSBAG_DIRECT_WRITE_ALIGNED_ALLOCATOR_H
+#define ROSBAG_DIRECT_WRITE_ALIGNED_ALLOCATOR_H
 
 #include <stdlib.h>
 #include <exception>
@@ -116,4 +116,4 @@ inline bool operator!=(const aligned_allocator<T1, N>&,
   return false;
 }
 
-#endif
+#endif  /* ROSBAG_DIRECT_WRITE_ALIGNED_ALLOCATOR_H */

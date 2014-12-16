@@ -13,8 +13,8 @@
  * limitations under the License.
  */
 
-#ifndef ROSBAG_BAG_DIRECT_IMPL_H
-#define ROSBAG_BAG_DIRECT_IMPL_H
+#ifndef ROSBAG_BAG_DIRECT_BAG_DIRECT_IMPL_H
+#define ROSBAG_BAG_DIRECT_BAG_DIRECT_IMPL_H
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -732,4 +732,4 @@ DirectFile::write_data(const uint8_t *start, size_t length)
 
 } /* namespace rosbag_direct_write */
 
-#endif
+#endif  /* ROSBAG_BAG_DIRECT_BAG_DIRECT_IMPL_H */
