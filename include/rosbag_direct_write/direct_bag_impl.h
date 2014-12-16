@@ -16,22 +16,29 @@
 #ifndef ROSBAG_BAG_DIRECT_IMPL_H
 #define ROSBAG_BAG_DIRECT_IMPL_H
 
+#include <unistd.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 
-#include <ros/console.h>
-#include <rosbag/stream.h>  // For CompressionType Enum
+#include <grosbag/stream.h>  // For CompressionType Enum
+#include <grosbag/bag.h>
 
 #include "direct_bag.h"
+
+#ifndef UNUSED
+#define UNUSED(x) (void)(x)
+#endif
 
 namespace rosbag_direct_write
 {
 
+namespace rosbag = grosbag;
 using rosbag::compression::CompressionType;
+using namespace rosbag;
 
 namespace impl
 {
 
-using namespace rosbag;
 using std::string;
 
 template<typename T>
@@ -41,7 +48,7 @@ string to_header_string(T const* field)
 }
 
 template<> string
-to_header_string<ros::Time>(ros::Time const* field)
+to_header_string<gros::Time>(gros::Time const* field)
 {
     uint64_t packed_time = (((uint64_t) field->nsec) << 32) + field->sec;
     return to_header_string(&packed_time);
@@ -80,9 +87,9 @@ write_version(VectorBuffer &buffer)
 inline uint32_t
 write_header(VectorBuffer &buffer, std::map<string, string> const &fields)
 {
-  boost::shared_array<uint8_t> header_buffer;
+  std::shared_ptr<uint8_t> header_buffer;
   uint32_t header_len;
-  ros::Header::write(fields, header_buffer, header_len);
+  gros::Header::write(fields, header_buffer, header_len);
   write_to_buffer(buffer, header_len, 4);
   write_ptr_to_buffer(buffer, header_buffer.get(), header_len);
   return header_len;
@@ -199,12 +206,23 @@ stop_writing(VectorBuffer &buffer,
 
 } /* namespace impl */
 
-DirectBag::DirectBag(std::string filename)
-: filename_(filename),
-  file_(new DirectFile(filename)),
-  open_(false),
-  file_header_record_offset_(0)
+DirectBag::DirectBag(std::string filename) : DirectBag() {
+  this->open(filename, grosbag::bagmode::Write);
+}
+
+DirectBag::DirectBag()
+    : filename_(""),
+      open_(false),
+      file_header_record_offset_(0),
+      next_conn_id_(0) {}
+
+void DirectBag::open(std::string filename, grosbag::bagmode::BagMode mode)
 {
+  UNUSED(mode);
+  LOG(INFO) << "Opening DirectBag";
+  assert(mode == grosbag::bagmode::Write);
+  file_.reset(new DirectFile(filename));
+  filename_ = filename;
   VectorBuffer start_buffer;
   file_header_record_offset_ = impl::start_writing(start_buffer);
   file_->write_buffer(start_buffer);
@@ -260,19 +278,9 @@ write_chunk_header(VectorBuffer &buffer,
                    uint32_t compressed_size,
                    uint32_t uncompressed_size)
 {
+  UNUSED(compression);
   rosbag::ChunkHeader chunk_header;
-  switch (compression)
-  {
-    case rosbag::compression::Uncompressed:
-      chunk_header.compression = rosbag::COMPRESSION_NONE;
-      break;
-    case rosbag::compression::BZ2:
-      chunk_header.compression = rosbag::COMPRESSION_BZ2;
-      break;
-    case rosbag::compression::LZ4:
-      chunk_header.compression = rosbag::COMPRESSION_LZ4;
-      break;
-  }
+  chunk_header.compression = rosbag::COMPRESSION_NONE;
   chunk_header.compressed_size   = compressed_size;
   chunk_header.uncompressed_size = uncompressed_size;
 
@@ -307,7 +315,7 @@ write_index_records(
 
     // Write the index record header
     uint32_t index_size = index.size();
-    ros::M_string header;
+    gros::M_string header;
     header[rosbag::OP_FIELD_NAME]         = \
       impl::to_header_string(&rosbag::OP_INDEX_DATA);
     header[rosbag::CONNECTION_FIELD_NAME] = \
@@ -344,10 +352,10 @@ finish_chunk(
 template<class T> shared_ptr<rosbag::ConnectionInfo>
 DirectBag::get_connection_info(std::string const &topic,
                                T const& msg,
-                               shared_ptr<ros::M_string> connection_header)
+                               shared_ptr<gros::M_string> connection_header)
 {
   shared_ptr<rosbag::ConnectionInfo> connection_info;
-  uint32_t conn_id = 0;
+  uint32_t conn_id = next_conn_id_;
   if (!connection_header)
   {
     // Lookup connection_info by topic if possible
@@ -367,7 +375,7 @@ DirectBag::get_connection_info(std::string const &topic,
     // only by topic name (i.e. same callerid, same message type), #3755.
     // This modified connection header is only used for our bookkeeping, and
     // will not appear in the resulting .bag.
-    ros::M_string connection_header_copy(*connection_header);
+    gros::M_string connection_header_copy(*connection_header);
     connection_header_copy["topic"] = topic;
 
     auto header_connection_id_pair = \
@@ -386,10 +394,10 @@ DirectBag::get_connection_info(std::string const &topic,
     connection_info->id       = conn_id;
     connection_info->topic    = topic;
     connection_info->datatype = \
-      std::string(ros::message_traits::datatype(msg));
-    connection_info->md5sum   = std::string(ros::message_traits::md5sum(msg));
+      std::string(gros::message_traits::datatype(msg));
+    connection_info->md5sum   = std::string(gros::message_traits::md5sum(msg));
     connection_info->msg_def  = \
-      std::string(ros::message_traits::definition(msg));
+      std::string(gros::message_traits::definition(msg));
     if (connection_header != nullptr)
     {
       connection_info->header = connection_header;
@@ -406,6 +414,9 @@ DirectBag::get_connection_info(std::string const &topic,
 
     // And write connection info record to the chunk buffer
     impl::write_connection_record(chunk_buffer_, connection_info);
+
+    // Increment the conn_id for then next one that is created
+    next_conn_id_ += 1;
   }
 
   return connection_info;
@@ -413,8 +424,8 @@ DirectBag::get_connection_info(std::string const &topic,
 
 inline void
 generate_message_record_header(uint32_t conn_id,
-                               ros::Time const &time,
-                               ros::M_string &header)
+                               gros::Time const &time,
+                               gros::M_string &header)
 {
   header[rosbag::OP_FIELD_NAME]         = \
     impl::to_header_string(&rosbag::OP_MSG_DATA);
@@ -425,9 +436,9 @@ generate_message_record_header(uint32_t conn_id,
 inline size_t
 write_data_message_record_header(VectorBuffer &buffer,
                                  uint32_t conn_id,
-                                 ros::Time const &time)
+                                 gros::Time const &time)
 {
-  ros::M_string header;
+  gros::M_string header;
   generate_message_record_header(conn_id, time, header);
 
   return impl::write_header(buffer, header);
@@ -437,12 +448,12 @@ inline size_t
 write_data_message_record_header_with_padding(
   VectorBuffer &buffer,
   uint32_t conn_id,
-  ros::Time const &time,
+  gros::Time const &time,
   size_t current_file_offset,
   size_t serialized_message_data_len
 )
 {
-  ros::M_string header;
+  gros::M_string header;
   generate_message_record_header(conn_id, time, header);
   size_t buffer_starting_offset = buffer.size();
   // Write header
@@ -484,20 +495,14 @@ has_direct_data()
 }
 
 template<class T> void
-serialize_to_buffer(VectorBuffer &buffer, const T &msg)
-{
-  throw rosbag::BagException("serialize_to_buffer not implemented.");
-}
+serialize_to_buffer(VectorBuffer &buffer, const T &msg);
 
 template<class T> void
-serialize_to_file(DirectFile &file, const T &msg)
-{
-  throw rosbag::BagException("serialize_to_file not implemented.");
-}
+serialize_to_file(DirectFile &file, const T &msg);
 
 template<class T> void
-DirectBag::write(std::string const& topic, ros::Time const& time, T const& msg,
-                 shared_ptr<ros::M_string> connection_header)
+DirectBag::write(std::string const& topic, gros::Time const& time, T const& msg,
+                 shared_ptr<gros::M_string> connection_header)
 {
   // Assert that the bag is open
   if (!open_)
@@ -506,10 +511,10 @@ DirectBag::write(std::string const& topic, ros::Time const& time, T const& msg,
       "Tried to insert a message into a closed DirectBag.");
   }
   // Make sure a reasonable time is given
-  if (time < ros::TIME_MIN)
+  if (time < gros::TIME_MIN)
   {
     throw rosbag::BagException(
-      "Tried to insert a message with time < ros::MIN_TIME");
+      "Tried to insert a message with time < gros::MIN_TIME");
   }
 
   size_t chunk_start_pos_in_buffer = chunk_buffer_.size();
@@ -529,29 +534,14 @@ DirectBag::write(std::string const& topic, ros::Time const& time, T const& msg,
     this->get_connection_info(topic, msg, connection_header);
 
   // Figure out the size of the serialized message data
-  size_t message_data_len = ros::serialization::serializationLength(msg);
+  size_t message_data_len = gros::serialization::serializationLength(msg);
 
   // Write the message data record header
   size_t message_header_len;
-  bool should_pad = has_direct_data<T>();
-  if (should_pad)
-  {
-    message_header_len = write_data_message_record_header_with_padding(
-      chunk_buffer_,
-      connection_info->id,
-      time,
-      file_->get_offset(),
-      message_data_len
-    );
-  }
-  else
-  {
-    message_header_len = write_data_message_record_header(
-      chunk_buffer_,
-      connection_info->id,
-      time
-    );
-  }
+  // Always pad so that we write to a 4096 boundry
+  message_header_len = write_data_message_record_header_with_padding(
+      chunk_buffer_, connection_info->id, time, file_->get_offset(),
+      message_data_len);
 
   // Add to topic indexes
   rosbag::IndexEntry index_entry;
@@ -622,9 +612,9 @@ DirectBag::write(std::string const& topic, ros::Time const& time, T const& msg,
     // It is a normal ROS message, serialize normally
     size_t current_position = chunk_buffer_.size();
     chunk_buffer_.resize(chunk_buffer_.size() + message_data_len);
-    ros::serialization::OStream s(chunk_buffer_.data() + current_position,
+    gros::serialization::OStream s(chunk_buffer_.data() + current_position,
                                   message_data_len);
-    ros::serialization::serialize(s, msg);
+    gros::serialization::serialize(s, msg);
     file_->write_buffer(chunk_buffer_);
   }
   // Write the non direct part of the message to the buffer
@@ -649,6 +639,7 @@ public:
 
 DirectFile::DirectFile(std::string filename) : filename_(filename)
 {
+#ifdef __APPLE__
   file_pointer_ = fopen(filename.c_str(), "w+b");
   if (file_pointer_ == nullptr)
   {
@@ -664,27 +655,57 @@ DirectFile::DirectFile(std::string filename) : filename_(filename)
   {
     throw BagFileException("Failed to set F_NOCACHE", errno);
   }
+#else
+  int fd = open(filename.c_str(), O_CREAT | O_RDWR | O_DIRECT,
+                S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+  if (fd < 0) {
+    throw BagFileException(std::string("Failed to open file: ") + filename,
+                           errno);
+  }
+  file_descriptor_ = fd;
+#endif
+}
+
+DirectFile::~DirectFile() {
+#if __APPLE__
+  fclose(file_pointer_);
+#else
+  close(file_descriptor_);
+#endif
 }
 
 size_t
 DirectFile::get_offset() const
 {
-  ssize_t off = ftell(file_pointer_);
-  if (off < 0)
-  {
+#if __APPLE__
+  ssize_t offset = ftell(file_pointer_);
+  if (offset < 0) {
     throw BagFileException("Failed to get current offset", errno);
   }
-  return off;
+  return offset;
+#else
+  off_t offset = lseek(file_descriptor_, 0, SEEK_CUR);
+  if (offset < 0) {
+    throw BagFileException("Failed to get current offset", errno);
+  }
+  return offset;
+#endif
 }
 
 void
 DirectFile::seek(uint64_t pos) const
 {
-  ssize_t off = fseek(file_pointer_, pos, SEEK_SET);
-  if (off == -1)
-  {
+#if __APPLE__
+  ssize_t offset = fseek(file_pointer_, pos, SEEK_SET);
+  if (offset == -1) {
     throw BagFileException("Failed to seek", errno);
   }
+#else
+  off_t offset = lseek(file_descriptor_, pos, SEEK_SET);
+  if (offset == -1) {
+    throw BagFileException("Failed to seek", errno);
+  }
+#endif
 }
 
 size_t
@@ -696,13 +717,20 @@ DirectFile::write_buffer(VectorBuffer &buffer)
 size_t
 DirectFile::write_data(const uint8_t *start, size_t length)
 {
-  // ROS_INFO_STREAM("write_data: " << length);
+#if __APPLE__
   ssize_t ret = fwrite(start, sizeof(uint8_t), length, file_pointer_);
   if (ret < 0)
   {
     throw BagFileException("Failed to write", errno);
   }
   return ret;
+#else
+  ssize_t ret = write(file_descriptor_, start, length);
+  if (ret < 0) {
+    throw BagFileException("Failed to write", errno);
+  }
+  return ret;
+#endif
 }
 
 } /* namespace rosbag_direct_write */

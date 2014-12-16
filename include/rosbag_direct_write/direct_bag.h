@@ -16,25 +16,28 @@
 #ifndef ROSBAG_BAG_DIRECT_H
 #define ROSBAG_BAG_DIRECT_H
 
-#include <boost/shared_array.hpp>
-#include <ros/header.h>
-#include <ros/message_traits.h>
-#include <ros/serialization.h>
-#include <rosbag/constants.h>
-#include <rosbag/exceptions.h>
-#include <rosbag/structures.h>
+#include <memory>
+#include <gros/header.h>
+#include <gros/message_traits.h>
+#include <gros/serialization.h>
+#include <grosbag/constants.h>
+#include <grosbag/exceptions.h>
+#include <grosbag/structures.h>
 
 namespace rosbag_direct_write
 {
 
-using boost::shared_ptr;
+#include "aligned_allocator.h"
 
-typedef std::vector<uint8_t> VectorBuffer;
+using std::shared_ptr;
 
-class ROSBAG_DECL DirectFile
+typedef std::vector<uint8_t, aligned_allocator<uint8_t, 4096>> VectorBuffer;
+
+class GROSBAG_DECL DirectFile
 {
 public:
   DirectFile(std::string filename);
+  ~DirectFile();
 
   size_t get_offset() const;
   void seek(uint64_t pos) const;
@@ -46,55 +49,61 @@ public:
 
 private:
   std::string filename_;
+#if __APPLE__
   FILE *file_pointer_;
-
+#else
+  int file_descriptor_;
+#endif
 };
 
-class ROSBAG_DECL DirectBag
+class GROSBAG_DECL DirectBag
 {
 public:
   DirectBag(std::string filename);
+  DirectBag();
 
   ~DirectBag();
 
+  void open(std::string filename, grosbag::bagmode::BagMode mode);
+
   template<class T>
   void write(std::string const& topic,
-             ros::Time const& time,
+             gros::Time const& time,
              shared_ptr<T const> const& msg,
-             shared_ptr<ros::M_string> connection_header = 0)
+             shared_ptr<gros::M_string> connection_header = 0)
   {
     write(topic, time, *msg, connection_header);
   }
 
   template<class T>
   void write(std::string const& topic,
-             ros::Time const& time,
+             gros::Time const& time,
              shared_ptr<T> const& msg,
-             shared_ptr<ros::M_string> connection_header = 0)
+             shared_ptr<gros::M_string> connection_header = 0)
   {
     write(topic, time, *msg, connection_header);
   }
 
   template<class T>
   void write(std::string const& topic,
-             ros::Time const& time,
+             gros::Time const& time,
              T const& msg,
-             shared_ptr<ros::M_string> connection_header = 0);
+             shared_ptr<gros::M_string> connection_header = 0);
 
   void close();
   bool is_open() const;
 
 private:
-  template<class T> shared_ptr<rosbag::ConnectionInfo>
+  template<class T> shared_ptr<grosbag::ConnectionInfo>
   get_connection_info(std::string const &topic,
                       T const& msg,
-                      shared_ptr<ros::M_string> connection_header);
+                      shared_ptr<gros::M_string> connection_header);
 
   template<class T> void
   write_message_data_record(uint32_t conn_id,
-                            ros::Time const& time,
+                            gros::Time const& time,
                             T const& msg,
-                            rosbag::ChunkInfo &chunk_info);
+                            grosbag::ChunkInfo &chunk_info);
 
 
   std::string filename_;
@@ -105,14 +114,15 @@ private:
   size_t file_header_record_offset_;
 
   std::map<std::string, uint32_t> topic_connection_ids_;
-  std::map<ros::M_string, uint32_t> header_connection_ids_;
+  std::map<gros::M_string, uint32_t> header_connection_ids_;
 
-  std::map<uint32_t, shared_ptr<rosbag::ConnectionInfo>> connections_;
-  std::map<uint32_t, std::multiset<rosbag::IndexEntry> > connection_indexes_;
-  std::vector<rosbag::ChunkInfo> chunk_infos_;
+  std::map<uint32_t, shared_ptr<grosbag::ConnectionInfo>> connections_;
+  std::map<uint32_t, std::multiset<grosbag::IndexEntry> > connection_indexes_;
+  std::vector<grosbag::ChunkInfo> chunk_infos_;
 
   VectorBuffer chunk_buffer_;
 
+  uint32_t next_conn_id_;
 };
 
 } // namespace rosbag_direct_write
