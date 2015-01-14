@@ -26,8 +26,9 @@
 #include <memory>
 
 template <class T, std::size_t N>
-class aligned_allocator {
- public:
+class aligned_allocator
+{
+public:
   typedef T value_type;
   typedef T* pointer;
   typedef const T* const_pointer;
@@ -38,9 +39,10 @@ class aligned_allocator {
   typedef T& reference;
   typedef const T& const_reference;
 
- public:
+public:
   template <class U>
-  struct rebind {
+  struct rebind
+  {
     typedef aligned_allocator<U, N> other;
   };
 
@@ -49,70 +51,88 @@ class aligned_allocator {
   template <class U>
   aligned_allocator(const aligned_allocator<U, N>&) {}
 
-  pointer address(reference value) const { return std::addressof(value); }
-
-  const_pointer address(const_reference value) const {
+  pointer address(reference value) const
+  {
     return std::addressof(value);
   }
 
-  pointer allocate(size_type size, const_void_pointer = 0) {
+  const_pointer address(const_reference value) const
+  {
+    return std::addressof(value);
+  }
+
+  pointer allocate(size_type size, const_void_pointer = 0)
+  {
     void* p;
-    if (0 != posix_memalign(&p, N, sizeof(T) * size)) {
+    if (0 != posix_memalign(&p, N, sizeof(T) * size))
+    {
       throw std::bad_alloc();
     }
-    if (!p && size > 0) {
+    if (!p && size > 0)
+    {
       throw std::bad_alloc();
     }
     return static_cast<T*>(p);
   }
 
-  void deallocate(pointer ptr, size_type) { free(ptr); }
+  void deallocate(pointer ptr, size_type)
+  {
+    free(ptr);
+  }
 
-  size_type max_size() const {
+  size_type max_size() const
+  {
     return ~static_cast<std::size_t>(0) / sizeof(T);
   }
 
   template <class U, class... Args>
-  void construct(U* ptr, Args&&... args) {
+  void construct(U* ptr, Args&&... args)
+  {
     void* p = ptr;
     new (p) U(std::forward<Args>(args)...);
   }
 
   template <class U>
-  void construct(U* ptr) {
+  void construct(U* ptr)
+  {
     void* p = ptr;
     new (p) U();
   }
 
   template <class U>
-  void destroy(U* ptr) {
+  void destroy(U* ptr)
+  {
     (void)ptr;
     ptr->~U();
   }
 };
 
 template <std::size_t N>
-class aligned_allocator<void, N> {
- public:
+class aligned_allocator<void, N>
+{
+public:
   typedef void value_type;
   typedef void* pointer;
   typedef const void* const_pointer;
 
   template <class U>
-  struct rebind {
+  struct rebind
+  {
     typedef aligned_allocator<U, N> other;
   };
 };
 
 template <class T1, class T2, std::size_t N>
 inline bool operator==(const aligned_allocator<T1, N>&,
-                       const aligned_allocator<T2, N>&) {
+                       const aligned_allocator<T2, N>&)
+{
   return true;
 }
 
 template <class T1, class T2, std::size_t N>
 inline bool operator!=(const aligned_allocator<T1, N>&,
-                       const aligned_allocator<T2, N>&) {
+                       const aligned_allocator<T2, N>&)
+{
   return false;
 }
 
