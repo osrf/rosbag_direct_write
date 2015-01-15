@@ -39,10 +39,16 @@ namespace impl
 
 using std::string;
 
-template<typename T>
-string to_header_string(T const* field)
+template<typename T> string
+to_header_string(T const* field)
 {
     return string((char*) field, sizeof(T));
+}
+
+template<> string
+to_header_string<std::string>(std::string const* field)
+{
+  return string(*field);
 }
 
 template<> string
