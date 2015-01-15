@@ -83,7 +83,9 @@ write_ptr_to_buffer(VectorBuffer &buffer, const T *data, size_t data_length)
 inline void
 write_version(VectorBuffer &buffer)
 {
-  string version = string("#ROSBAG V") + VERSION + string("\n");
+  // Yes... rosbag uses all upper case variable names for non-macro constants.
+  // Even ones like VERSION which are likely to collide, this is really stupid.
+  string version = string("#ROSBAG V") + rosbag::VERSION + string("\n");
 
   write_to_buffer(buffer, version);
 }
