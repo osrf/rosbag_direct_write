@@ -277,11 +277,9 @@ bool DirectBag::is_open() const
 
 inline size_t
 write_chunk_header(VectorBuffer &buffer,
-                   CompressionType compression,
                    uint32_t compressed_size,
                    uint32_t uncompressed_size)
 {
-  UNUSED(compression);
   rosbag::ChunkHeader chunk_header;
   chunk_header.compression = rosbag::COMPRESSION_NONE;
   chunk_header.compressed_size   = compressed_size;
@@ -529,8 +527,7 @@ DirectBag::write(std::string const& topic, ros::Time const& time, T const& msg,
   chunk_info.start_time = time;
   chunk_info.end_time   = time;
   // This is a place holder, later we'll create the real one and replace it
-  size_t chunk_header_len = write_chunk_header(
-    chunk_buffer_, CompressionType::Uncompressed, 0, 0);
+  size_t chunk_header_len = write_chunk_header(chunk_buffer_, 0, 0);
 
   // Get ID for connection header
   auto connection_info = \
@@ -592,10 +589,7 @@ DirectBag::write(std::string const& topic, ros::Time const& time, T const& msg,
   chunk_size -= 4;
   // Then replace the place-holder chunk header
   VectorBuffer header_buffer;
-  write_chunk_header(header_buffer,
-                     CompressionType::Uncompressed,
-                     chunk_size,
-                     chunk_size);
+  write_chunk_header(header_buffer, chunk_size, chunk_size);
   std::copy(header_buffer.begin(), header_buffer.end(),
             chunk_buffer_.begin() + chunk_start_pos_in_buffer);
 
