@@ -636,7 +636,7 @@ public:
     {}
 };
 
-DirectFile::DirectFile(std::string filename) : filename_(filename)
+DirectFile::DirectFile(std::string filename) : filename_(filename), open_(true)
 {
 #ifdef __APPLE__
   file_pointer_ = fopen(filename.c_str(), "w+b");
@@ -666,12 +666,27 @@ DirectFile::DirectFile(std::string filename) : filename_(filename)
 #endif
 }
 
-DirectFile::~DirectFile() {
+DirectFile::~DirectFile()
+{
+  if (open_)
+  {
+    this->close();
+  }
+}
+
+bool DirectFile::is_open()
+{
+  return open_;
+}
+
+void DirectFile::close()
+{
 #if __APPLE__
   fclose(file_pointer_);
 #else
   close(file_descriptor_);
 #endif
+  open_ = false;
 }
 
 size_t

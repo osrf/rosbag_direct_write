@@ -43,6 +43,10 @@ public:
 
   std::string get_filename() {return this->filename_;}
 
+  bool is_open();
+
+  void close();
+
 private:
   std::string filename_;
 #if __APPLE__
@@ -50,6 +54,8 @@ private:
 #else
   int file_descriptor_;
 #endif
+  bool open_;
+
 };
 
 class ROSBAG_DIRECT_WRITE_DECL DirectBag
