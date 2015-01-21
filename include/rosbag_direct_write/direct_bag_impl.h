@@ -657,7 +657,8 @@ DirectFile::DirectFile(std::string filename) : filename_(filename)
 #else
   int fd = open(filename.c_str(), O_CREAT | O_RDWR | O_DIRECT,
                 S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
-  if (fd < 0) {
+  if (fd < 0)
+  {
     throw BagFileException(std::string("Failed to open file: ") + filename,
                            errno);
   }
@@ -678,13 +679,15 @@ DirectFile::get_offset() const
 {
 #if __APPLE__
   ssize_t offset = ftell(file_pointer_);
-  if (offset < 0) {
+  if (offset < 0)
+  {
     throw BagFileException("Failed to get current offset", errno);
   }
   return offset;
 #else
   off_t offset = lseek(file_descriptor_, 0, SEEK_CUR);
-  if (offset < 0) {
+  if (offset < 0)
+  {
     throw BagFileException("Failed to get current offset", errno);
   }
   return offset;
@@ -696,12 +699,14 @@ DirectFile::seek(uint64_t pos) const
 {
 #if __APPLE__
   ssize_t offset = fseek(file_pointer_, pos, SEEK_SET);
-  if (offset == -1) {
+  if (offset == -1)
+  {
     throw BagFileException("Failed to seek", errno);
   }
 #else
   off_t offset = lseek(file_descriptor_, pos, SEEK_SET);
-  if (offset == -1) {
+  if (offset == -1)
+  {
     throw BagFileException("Failed to seek", errno);
   }
 #endif
@@ -725,7 +730,8 @@ DirectFile::write_data(const uint8_t *start, size_t length)
   return ret;
 #else
   ssize_t ret = write(file_descriptor_, start, length);
-  if (ret < 0) {
+  if (ret < 0)
+  {
     throw BagFileException("Failed to write", errno);
   }
   return ret;

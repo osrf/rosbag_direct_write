@@ -24,7 +24,7 @@ namespace rosbag_direct_write
 
 #include "aligned_allocator.h"
 
-// Defined in dependencies header and is either shared_ptr from boost or std
+// Defined in dependencies header and is a shared_ptr from either boost or std
 using rosbag_direct_write::shared_ptr;
 
 typedef std::vector<uint8_t, aligned_allocator<uint8_t, 4096>> VectorBuffer;
@@ -100,7 +100,6 @@ private:
                             ros::Time const& time,
                             T const& msg,
                             rosbag::ChunkInfo &chunk_info);
-
 
   std::string filename_;
   shared_ptr<DirectFile> file_;
