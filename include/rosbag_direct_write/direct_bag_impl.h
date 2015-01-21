@@ -270,6 +270,8 @@ void DirectBag::close()
   );
   file_->seek(file_header_record_offset_);
   file_->write_buffer(file_header_buffer);
+  file_->close();
+  file_.reset();
 }
 
 bool DirectBag::is_open() const
