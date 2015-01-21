@@ -6,7 +6,9 @@ find_package(catkin REQUIRED COMPONENTS cpp_common rosbag_storage)
 catkin_package(CATKIN_DEPENDS cpp_common rosbag_storage)
 
 if(CATKIN_ENABLE_TESTING)
-  include_directories(include)
+  find_package(sensor_msgs REQUIRED)
+  list(APPEND catkin_LIBRARIES ${sensor_msgs_LIBRARIES})
+  include_directories(include ${catkin_INCLUDE_DIRS} ${sensor_msgs_INCLUDE_DIRS})
   # Make sure include_directories and catkin_LIBRARIES are setup before adding
   add_subdirectory(test)
 endif()
