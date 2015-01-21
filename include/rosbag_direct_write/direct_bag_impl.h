@@ -233,12 +233,12 @@ void DirectBag::open(std::string filename, rosbag::bagmode::BagMode mode)
   file_header_record_offset_ = impl::start_writing(start_buffer);
   file_->write_buffer(start_buffer);
   chunk_buffer_.clear();
-  open_ = true;
+  open_.store(true);
 }
 
 DirectBag::~DirectBag()
 {
-  if (open_)
+  if (this->is_open())
   {
     this->close();
   }
@@ -246,11 +246,11 @@ DirectBag::~DirectBag()
 
 void DirectBag::close()
 {
-  if (!open_)
+  bool was_open = open_.exchange(false);
+  if (!was_open)
   {
     throw rosbag::BagException("Tried to close and already closed DirectBag.");
   }
-  open_ = false;
   // Write any remaining chunk_buffer_ stuff
   if (chunk_buffer_.size() != 0)
   {
@@ -277,7 +277,7 @@ void DirectBag::close()
 
 bool DirectBag::is_open() const
 {
-  return open_;
+  return open_.load();
 }
 
 inline size_t
@@ -524,7 +524,7 @@ DirectBag::write(std::string const& topic, ros::Time const& time, T const& msg,
                  shared_ptr<ros::M_string> connection_header)
 {
   // Assert that the bag is open
-  if (!open_)
+  if (!is_open())
   {
     throw rosbag::BagException(
       "Tried to insert a message into a closed DirectBag.");

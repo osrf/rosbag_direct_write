@@ -16,6 +16,7 @@
 #ifndef ROSBAG_BAG_DIRECT_BAG_DIRECT_H
 #define ROSBAG_BAG_DIRECT_BAG_DIRECT_H
 
+#include <atomic>
 #include <memory>
 #include <rosbag_direct_write/direct_bag_dependencies.h>
 
@@ -110,7 +111,7 @@ private:
   std::string filename_;
   shared_ptr<DirectFile> file_;
 
-  bool open_;
+  std::atomic<bool> open_;
 
   size_t file_header_record_offset_;
 
