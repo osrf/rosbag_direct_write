@@ -16,9 +16,10 @@
 #ifndef ROSBAG_BAG_DIRECT_BAG_DIRECT_IMPL_H
 #define ROSBAG_BAG_DIRECT_BAG_DIRECT_IMPL_H
 
-#include <unistd.h>
 #include <fcntl.h>
+#include <stdexcept>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #include <rosbag_direct_write/direct_bag_impl_dependencies.h>
 
@@ -499,11 +500,24 @@ has_direct_data()
   return false;
 }
 
-template<class T> void
-serialize_to_buffer(VectorBuffer &buffer, const T &msg);
+class not_implemented_exception : public std::logic_error
+{
+public:
+  explicit not_implemented_exception(const char * what_arg)
+  : std::logic_error(what_arg) {}
+};
 
 template<class T> void
-serialize_to_file(DirectFile &file, const T &msg);
+serialize_to_buffer(VectorBuffer &buffer, const T &msg)
+{
+  throw not_implemented_exception("serialize_to_buffer not implemented");
+}
+
+template<class T> void
+serialize_to_file(DirectFile &file, const T &msg)
+{
+  throw not_implemented_exception("serialize_to_file not implemented");
+}
 
 template<class T> void
 DirectBag::write(std::string const& topic, ros::Time const& time, T const& msg,
