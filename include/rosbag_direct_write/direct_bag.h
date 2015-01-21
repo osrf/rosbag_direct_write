@@ -67,7 +67,7 @@ public:
 
   ~DirectBag();
 
-  void open(std::string filename, rosbag::bagmode::BagMode mode);
+  void open(std::string filename);
 
   template<class T>
   void write(std::string const& topic,

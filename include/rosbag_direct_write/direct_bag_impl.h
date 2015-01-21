@@ -213,20 +213,17 @@ stop_writing(VectorBuffer &buffer,
 
 } /* namespace impl */
 
-DirectBag::DirectBag(std::string filename) : DirectBag() {
-  this->open(filename, rosbag::bagmode::Write);
+DirectBag::DirectBag(std::string filename) : DirectBag()
+{
+  this->open(filename);
 }
 
 DirectBag::DirectBag()
-    : filename_(""),
-      open_(false),
-      file_header_record_offset_(0),
-      next_conn_id_(0) {}
+: filename_(""), open_(false), file_header_record_offset_(0), next_conn_id_(0)
+{}
 
-void DirectBag::open(std::string filename, rosbag::bagmode::BagMode mode)
+void DirectBag::open(std::string filename)
 {
-  UNUSED(mode);
-  assert(mode == rosbag::bagmode::Write);
   file_.reset(new DirectFile(filename));
   filename_ = filename;
   VectorBuffer start_buffer;
