@@ -16,6 +16,7 @@
 #ifndef ROSBAG_BAG_DIRECT_BAG_DIRECT_IMPL_H
 #define ROSBAG_BAG_DIRECT_BAG_DIRECT_IMPL_H
 
+#include <errno.h>
 #include <fcntl.h>
 #include <stdexcept>
 #include <sys/stat.h>
@@ -507,12 +508,16 @@ public:
 template<class T> void
 serialize_to_buffer(VectorBuffer &buffer, const T &msg)
 {
+  UNUSED(buffer);
+  UNUSED(msg);
   throw not_implemented_exception("serialize_to_buffer not implemented");
 }
 
 template<class T> void
 serialize_to_file(DirectFile &file, const T &msg)
 {
+  UNUSED(file);
+  UNUSED(msg);
   throw not_implemented_exception("serialize_to_file not implemented");
 }
 
@@ -697,7 +702,7 @@ void DirectFile::close()
 #if __APPLE__
   fclose(file_pointer_);
 #else
-  close(file_descriptor_);
+  ::close(file_descriptor_);
 #endif
   open_ = false;
 }
@@ -757,7 +762,7 @@ DirectFile::write_data(const uint8_t *start, size_t length)
   }
   return ret;
 #else
-  ssize_t ret = write(file_descriptor_, start, length);
+  ssize_t ret = ::write(file_descriptor_, start, length);
   if (ret < 0)
   {
     throw BagFileException("Failed to write", errno);

@@ -63,11 +63,15 @@ public:
 
   pointer allocate(size_type size, const_void_pointer = 0)
   {
+#if __ANDROID__
+    void* p = memalign(N, sizeof(T) * size);
+#else
     void* p;
     if (0 != posix_memalign(&p, N, sizeof(T) * size))
     {
       throw std::bad_alloc();
     }
+#endif
     if (!p && size > 0)
     {
       throw std::bad_alloc();
