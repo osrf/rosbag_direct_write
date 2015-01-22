@@ -89,9 +89,10 @@ TEST(DirectBagImplTestSuite, test_write_header)
 TEST(DirectBagImplTestSuite, test_write_file_header_record)
 {
   rosbag_direct_write::VectorBuffer buffer;
-  rosbag_direct_write::impl::write_file_header_record(buffer, 0, 4, 2, 4096);
+  rosbag_direct_write::impl::write_file_header_record(buffer, 4, 2, 4096);
   // Construct expected serialized file header
   rosbag_direct_write::VectorBuffer expected;
+  rosbag_direct_write::impl::write_version(expected);
   // The format is (from rosbag spec):
   //   total header length then
   //   for each key-value pair:

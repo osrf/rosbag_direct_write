@@ -106,11 +106,12 @@ write_header(VectorBuffer &buffer, std::map<string, string> const &fields)
 inline void
 write_file_header_record(
   VectorBuffer &buffer,
-  size_t starting_offset,
   uint32_t connection_count,
   uint32_t chunk_count,
   uint64_t index_data_position)
 {
+  write_version(buffer);
+  size_t version_length = buffer.size();
   std::map<string, string> header;
   header[OP_FIELD_NAME]               = to_header_string(&OP_FILE_HEADER);
   header[INDEX_POS_FIELD_NAME]        = to_header_string(&index_data_position);
@@ -118,12 +119,9 @@ write_file_header_record(
   header[CHUNK_COUNT_FIELD_NAME]      = to_header_string(&chunk_count);
 
   uint32_t header_len = write_header(buffer, header);
-  uint32_t data_len = 0;
-  if (header_len < FILE_HEADER_LENGTH)
-  {
-    // 4096 - header_len - version - header_len_len - data_len_len
-    data_len = FILE_HEADER_LENGTH - header_len - starting_offset - 4 - 4;
-  }
+  assert(header_len < 4096);  // Anything else cannot be handled currently.
+  // 4096 - header_len - version - header_len_len - data_len_len
+  uint32_t data_len = 4096 - version_length - header_len - 4 - 4;
   write_to_buffer(buffer, data_len, 4);
 
   // Pad the file header record out
@@ -135,13 +133,10 @@ write_file_header_record(
   }
 }
 
-inline size_t
+inline void
 start_writing(VectorBuffer &buffer)
 {
-  write_version(buffer);
-  size_t file_header_record_offset = buffer.size();
-  write_file_header_record(buffer, file_header_record_offset, 0, 0, 0);
-  return file_header_record_offset;
+  write_file_header_record(buffer, 0, 0, 0);
 }
 
 inline void
@@ -220,7 +215,7 @@ DirectBag::DirectBag(std::string filename) : DirectBag()
 }
 
 DirectBag::DirectBag()
-: filename_(""), open_(false), file_header_record_offset_(0), next_conn_id_(0)
+: filename_(""), open_(false), next_conn_id_(0)
 {}
 
 void DirectBag::open(std::string filename)
@@ -228,7 +223,7 @@ void DirectBag::open(std::string filename)
   file_.reset(new DirectFile(filename));
   filename_ = filename;
   VectorBuffer start_buffer;
-  file_header_record_offset_ = impl::start_writing(start_buffer);
+  impl::start_writing(start_buffer);
   file_->write_buffer(start_buffer);
   chunk_buffer_.clear();
   open_.store(true);
@@ -249,25 +244,32 @@ void DirectBag::close()
   {
     throw rosbag::BagException("Tried to close and already closed DirectBag.");
   }
-  // Write any remaining chunk_buffer_ stuff
+  VectorBuffer stop_buffer;
+  // Write any remaining chunk_buffer_ stuff into the stop_buffer
   if (chunk_buffer_.size() != 0)
   {
-    file_->write_buffer(chunk_buffer_);
+    impl::write_to_buffer(stop_buffer, chunk_buffer_);
     chunk_buffer_.clear();
   }
-  size_t index_data_position = file_->get_offset();
-  VectorBuffer stop_buffer;
+  size_t index_data_position = file_->get_offset() + stop_buffer.size();
   impl::stop_writing(stop_buffer, connections_, chunk_infos_);
+  // Pad the stop_buffer with 0x00 up to a 4096 boundary
+  size_t stop_buffer_misalignment = stop_buffer.size() % 4096;
+  if (stop_buffer_misalignment != 0)
+  {
+    stop_buffer.resize(stop_buffer.size() + (4096 - stop_buffer_misalignment),
+                       0x00);
+  }
   file_->write_buffer(stop_buffer);
+  // Write the updated file header
   VectorBuffer file_header_buffer;
   impl::write_file_header_record(
     file_header_buffer,
-    file_header_record_offset_,
     connections_.size(),
     chunk_infos_.size(),
     index_data_position
   );
-  file_->seek(file_header_record_offset_);
+  file_->seek(0);
   file_->write_buffer(file_header_buffer);
   file_->close();
   file_.reset();

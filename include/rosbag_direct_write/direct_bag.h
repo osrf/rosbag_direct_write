@@ -143,8 +143,6 @@ private:
 
   std::atomic<bool> open_;
 
-  size_t file_header_record_offset_;
-
   std::map<std::string, uint32_t> topic_connection_ids_;
   std::map<ros::M_string, uint32_t> header_connection_ids_;
 
