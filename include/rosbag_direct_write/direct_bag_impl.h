@@ -754,6 +754,10 @@ DirectFile::write_buffer(VectorBuffer &buffer)
 size_t
 DirectFile::write_data(const uint8_t *start, size_t length)
 {
+#ifndef NDEBUG
+  assert((reinterpret_cast<uintptr_t>(start) % 4096) == 0);
+  assert((length % 4096) == 0);
+#endif
 #if __APPLE__
   ssize_t ret = fwrite(start, sizeof(uint8_t), length, file_pointer_);
   if (ret < 0)
