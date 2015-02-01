@@ -209,19 +209,72 @@ stop_writing(VectorBuffer &buffer,
 
 } /* namespace impl */
 
-DirectBag::DirectBag(std::string filename) : DirectBag()
+inline size_t
+write_chunk_header(VectorBuffer &buffer,
+                   uint32_t compressed_size,
+                   uint32_t uncompressed_size)
 {
-  this->open(filename);
+  rosbag::ChunkHeader chunk_header;
+  chunk_header.compression = rosbag::COMPRESSION_NONE;
+  chunk_header.compressed_size   = compressed_size;
+  chunk_header.uncompressed_size = uncompressed_size;
+
+  std::map<std::string, std::string> header;
+  header[rosbag::OP_FIELD_NAME] = impl::to_header_string(&rosbag::OP_CHUNK);
+  header[rosbag::COMPRESSION_FIELD_NAME] = chunk_header.compression;
+  header[rosbag::SIZE_FIELD_NAME] = \
+    impl::to_header_string(&chunk_header.uncompressed_size);
+  size_t header_len = impl::write_header(buffer, header);
+
+  impl::write_to_buffer(buffer, chunk_header.compressed_size, 4);
+  return header_len;
 }
 
+inline void
+generate_message_record_header(uint32_t conn_id,
+                               ros::Time const &time,
+                               ros::M_string &header)
+{
+  header[rosbag::OP_FIELD_NAME]         = \
+    impl::to_header_string(&rosbag::OP_MSG_DATA);
+  header[rosbag::CONNECTION_FIELD_NAME] = impl::to_header_string(&conn_id);
+  header[rosbag::TIME_FIELD_NAME]       = impl::to_header_string(&time);
+}
+
+inline size_t
+write_data_message_record_header(VectorBuffer &buffer,
+                                 uint32_t conn_id,
+                                 ros::Time const &time)
+{
+  ros::M_string header;
+  generate_message_record_header(conn_id, time, header);
+
+  return impl::write_header(buffer, header);
+}
+
+DirectBag::DirectBag(std::string filename, size_t chunk_threshold)
+: DirectBag()
+{
+  this->open(filename, chunk_threshold);
+}
+
+static VectorBuffer __temp_constant_buffer;
+static const size_t kchunk_header_length_ = \
+  write_chunk_header(__temp_constant_buffer, 0, 0);
+static const size_t kmessage_header_length_ = \
+  write_data_message_record_header(__temp_constant_buffer, 0, ros::Time(0));
+
 DirectBag::DirectBag()
-: filename_(""), open_(false), next_conn_id_(0)
+: filename_(""), open_(false), current_chunk_position_(0),
+  current_chunk_info_(nullptr), chunk_threshold_(kdefault_chunk_threshold),
+  next_conn_id_(0)
 {}
 
-void DirectBag::open(std::string filename)
+void DirectBag::open(std::string filename, size_t chunk_threshold)
 {
   file_.reset(new DirectFile(filename));
   filename_ = filename;
+  chunk_threshold_ = chunk_threshold;
   VectorBuffer start_buffer;
   impl::start_writing(start_buffer);
   file_->write_buffer(start_buffer);
@@ -237,6 +290,52 @@ DirectBag::~DirectBag()
   }
 }
 
+inline void
+write_index_records(
+  VectorBuffer &buffer,
+  std::map<uint32_t, std::multiset<rosbag::IndexEntry>>
+    &chunk_connection_indexes
+)
+{
+  for (auto &index_entry_pair : chunk_connection_indexes)
+  {
+    uint32_t connection_id = index_entry_pair.first;
+    std::multiset<rosbag::IndexEntry> &index = index_entry_pair.second;
+
+    // Write the index record header
+    uint32_t index_size = index.size();
+    ros::M_string header;
+    header[rosbag::OP_FIELD_NAME]         = \
+      impl::to_header_string(&rosbag::OP_INDEX_DATA);
+    header[rosbag::CONNECTION_FIELD_NAME] = \
+      impl::to_header_string(&connection_id);
+    header[rosbag::VER_FIELD_NAME]        = \
+      impl::to_header_string(&rosbag::INDEX_VERSION);
+    header[rosbag::COUNT_FIELD_NAME]      = \
+      impl::to_header_string(&index_size);
+    impl::write_header(buffer, header);
+
+    impl::write_to_buffer(buffer, index_size * 12, 4);
+
+    // Write the index record data (pairs of timestamp and position in file)
+    for(auto &entry : index)
+    {
+        impl::write_to_buffer(buffer, entry.time.sec, 4);
+        impl::write_to_buffer(buffer, entry.time.nsec, 4);
+        impl::write_to_buffer(buffer, entry.offset, 4);
+    }
+  }
+}
+
+inline void
+write_chunk_end(VectorBuffer &buffer,
+                std::map<uint32_t, std::multiset<rosbag::IndexEntry>>
+                  &chunk_connection_indexes)
+{
+  // Write out the indexes and clear them
+  write_index_records(buffer, chunk_connection_indexes);
+}
+
 void DirectBag::close()
 {
   bool was_open = open_.exchange(false);
@@ -245,6 +344,28 @@ void DirectBag::close()
     throw rosbag::BagException("Tried to close and already closed DirectBag.");
   }
   VectorBuffer stop_buffer;
+  // Finish any open chunks
+  if (current_chunk_info_ != nullptr)
+  {
+    // Calculate the chunk size
+    size_t chunk_size = file_->get_offset() + chunk_buffer_.size();
+    chunk_size -= current_chunk_info_->pos;
+    //   Adjust for chunk header's length
+    chunk_size -= kchunk_header_length_;
+    //   Adjust for length values of the header and the data
+    chunk_size -= 4;
+    chunk_size -= 4;
+    // Go ahead and create the end of the chunk and write it to the buffer
+    write_chunk_end(chunk_buffer_, current_chunk_connection_indexes_);
+    current_chunk_connection_indexes_.clear();
+    // Then replace the place-holder chunk header
+    VectorBuffer header_buffer;
+    write_chunk_header(header_buffer, chunk_size, chunk_size);
+    std::copy(header_buffer.begin(), header_buffer.end(),
+              chunk_buffer_.begin() + current_chunk_position_);
+    chunk_infos_.push_back(*current_chunk_info_);
+    current_chunk_info_.reset();
+  }
   // Write any remaining chunk_buffer_ stuff into the stop_buffer
   if (chunk_buffer_.size() != 0)
   {
@@ -281,78 +402,9 @@ bool DirectBag::is_open() const
 }
 
 inline size_t
-write_chunk_header(VectorBuffer &buffer,
-                   uint32_t compressed_size,
-                   uint32_t uncompressed_size)
-{
-  rosbag::ChunkHeader chunk_header;
-  chunk_header.compression = rosbag::COMPRESSION_NONE;
-  chunk_header.compressed_size   = compressed_size;
-  chunk_header.uncompressed_size = uncompressed_size;
-
-  std::map<std::string, std::string> header;
-  header[rosbag::OP_FIELD_NAME] = impl::to_header_string(&rosbag::OP_CHUNK);
-  header[rosbag::COMPRESSION_FIELD_NAME] = chunk_header.compression;
-  header[rosbag::SIZE_FIELD_NAME] = \
-    impl::to_header_string(&chunk_header.uncompressed_size);
-  size_t header_len = impl::write_header(buffer, header);
-
-  impl::write_to_buffer(buffer, chunk_header.compressed_size, 4);
-  return header_len;
-}
-
-inline size_t
 get_chunk_offset(size_t current_position, size_t chunk_data_position)
 {
   return current_position - chunk_data_position;
-}
-
-inline void
-write_index_records(
-  VectorBuffer &buffer,
-  std::map<uint32_t, std::multiset<rosbag::IndexEntry>>
-    &chunk_connection_indexes
-)
-{
-  for (auto &index_entry_pair : chunk_connection_indexes)
-  {
-    uint32_t connection_id = index_entry_pair.first;
-    std::multiset<rosbag::IndexEntry> index = index_entry_pair.second;
-
-    // Write the index record header
-    uint32_t index_size = index.size();
-    ros::M_string header;
-    header[rosbag::OP_FIELD_NAME]         = \
-      impl::to_header_string(&rosbag::OP_INDEX_DATA);
-    header[rosbag::CONNECTION_FIELD_NAME] = \
-      impl::to_header_string(&connection_id);
-    header[rosbag::VER_FIELD_NAME]        = \
-      impl::to_header_string(&rosbag::INDEX_VERSION);
-    header[rosbag::COUNT_FIELD_NAME]      = \
-      impl::to_header_string(&index_size);
-    impl::write_header(buffer, header);
-
-    impl::write_to_buffer(buffer, index_size * 12, 4);
-
-    // Write the index record data (pairs of timestamp and position in file)
-    for(auto &entry : index)
-    {
-        impl::write_to_buffer(buffer, entry.time.sec, 4);
-        impl::write_to_buffer(buffer, entry.time.nsec, 4);
-        impl::write_to_buffer(buffer, entry.offset, 4);
-    }
-  }
-}
-
-inline void
-finish_chunk(
-  VectorBuffer &buffer,
-  std::map<uint32_t, std::multiset<rosbag::IndexEntry>>
-    &chunk_connection_indexes
-)
-{
-  // Write out the indexes and clear them
-  write_index_records(buffer, chunk_connection_indexes);
 }
 
 template<class T> shared_ptr<rosbag::ConnectionInfo>
@@ -425,29 +477,10 @@ DirectBag::get_connection_info(std::string const &topic,
     next_conn_id_ += 1;
   }
 
+  // Always make sure that the topic -> conn_id map is up-to-date
+  topic_connection_ids_[topic] = conn_id;
+
   return connection_info;
-}
-
-inline void
-generate_message_record_header(uint32_t conn_id,
-                               ros::Time const &time,
-                               ros::M_string &header)
-{
-  header[rosbag::OP_FIELD_NAME]         = \
-    impl::to_header_string(&rosbag::OP_MSG_DATA);
-  header[rosbag::CONNECTION_FIELD_NAME] = impl::to_header_string(&conn_id);
-  header[rosbag::TIME_FIELD_NAME]       = impl::to_header_string(&time);
-}
-
-inline size_t
-write_data_message_record_header(VectorBuffer &buffer,
-                                 uint32_t conn_id,
-                                 ros::Time const &time)
-{
-  ros::M_string header;
-  generate_message_record_header(conn_id, time, header);
-
-  return impl::write_header(buffer, header);
 }
 
 inline size_t
@@ -469,7 +502,9 @@ write_data_message_record_header_with_padding(
                           + 4 // length of message data length
                           + serialized_message_data_len;
   size_t offset_to_4096_boundary = 4096 - (projected_offset % 4096);
+#ifndef NDEBUG
   assert((offset_to_4096_boundary + projected_offset) % 4096 == 0);
+#endif
   if (offset_to_4096_boundary == 4096)
   {
     // No alignment needed
@@ -523,6 +558,20 @@ serialize_to_file(DirectFile &file, const T &msg)
   throw not_implemented_exception("serialize_to_file not implemented");
 }
 
+size_t
+start_chunk(VectorBuffer &buffer,
+            shared_ptr<rosbag::ChunkInfo> &chunk_info,
+            const ros::Time &start_time,
+            size_t current_file_offset)
+{
+  // Initialize chunk info
+  chunk_info->pos        = current_file_offset + buffer.size();
+  chunk_info->start_time = start_time;
+  chunk_info->end_time   = ros::Time(0);
+  // This is a place holder, later we'll create the real one and replace it
+  return write_chunk_header(buffer, 0, 0);
+}
+
 template<class T> void
 DirectBag::write(std::string const& topic, ros::Time const& time, T const& msg,
                  shared_ptr<ros::M_string> connection_header)
@@ -540,16 +589,13 @@ DirectBag::write(std::string const& topic, ros::Time const& time, T const& msg,
       "Tried to insert a message with time < ros::MIN_TIME");
   }
 
-  size_t chunk_start_pos_in_buffer = chunk_buffer_.size();
-
-  // Setup chunk info
-  rosbag::ChunkInfo chunk_info;
-  // Initialize chunk info
-  chunk_info.pos        = file_->get_offset() + chunk_buffer_.size();
-  chunk_info.start_time = time;
-  chunk_info.end_time   = time;
-  // This is a place holder, later we'll create the real one and replace it
-  size_t chunk_header_len = write_chunk_header(chunk_buffer_, 0, 0);
+  // Start a chunk if one is not in progress
+  if (current_chunk_info_ == nullptr)
+  {
+    current_chunk_info_.reset(new rosbag::ChunkInfo());
+    current_chunk_position_ = chunk_buffer_.size();
+    start_chunk(chunk_buffer_, current_chunk_info_, time, file_->get_offset());
+  }
 
   // Get ID for connection header
   auto connection_info = \
@@ -558,62 +604,111 @@ DirectBag::write(std::string const& topic, ros::Time const& time, T const& msg,
   // Figure out the size of the serialized message data
   size_t message_data_len = ros::serialization::serializationLength(msg);
 
+  // Figure out if we should finish the chunk or not
+  bool should_finish_chunk = false;
+  if (has_direct_data<T>())
+  {
+    // Always finish a chunk before writing a direct data message
+    should_finish_chunk = true;
+  }
+  else
+  {
+    // See if the chunk meets or exceeds the chunk threshold
+    // Start with the current size of the chunk
+    size_t est_chunk_size = chunk_buffer_.size() - current_chunk_position_;
+    // Add the size of the data message recored header
+    est_chunk_size += kmessage_header_length_;
+    // Add the size of the message data length number
+    est_chunk_size += 4;
+    // Add the length of the message data
+    est_chunk_size += message_data_len;
+    if (est_chunk_size >= chunk_threshold_)
+    {
+      // If the predicted chunk size meets or exceeds the chunk threshold
+      // then finish this chunk after this message.
+      should_finish_chunk = true;
+    }
+  }
+
   // Write the message data record header
   size_t message_header_len;
-  // Always pad so that we write to a 4096 boundry
-  message_header_len = write_data_message_record_header_with_padding(
-      chunk_buffer_, connection_info->id, time, file_->get_offset(),
-      message_data_len);
+  if (should_finish_chunk)
+  {
+    // If we are finishing the chunk, pad so that we write to a 4096 boundry
+    message_header_len = write_data_message_record_header_with_padding(
+        chunk_buffer_, connection_info->id, time, file_->get_offset(),
+        message_data_len);
+  }
+  else
+  {
+    // Otherwise write the message header as normal, without extra padding
+    message_header_len = write_data_message_record_header(
+        chunk_buffer_, connection_info->id, time);
+  }
 
-  // Add to topic indexes
+  // Create an index entry for the message
   rosbag::IndexEntry index_entry;
+  // Capture the time the message was received
   index_entry.time      = time;
-  index_entry.chunk_pos = chunk_info.pos;
-  // Start with virtual position in file for offset
+  // Capture the position of the containing chunk
+  index_entry.chunk_pos = current_chunk_info_->pos;
+  // Calculate the offset of the message data in the chunk
+  // Start with absolute virtual position in file for offset
   index_entry.offset    = file_->get_offset() + chunk_buffer_.size();
-  // Adjust for position of chunk in file
-  index_entry.offset   -= chunk_info.pos;
-  // Adjust for message and chunk header
+  // Adjust for absolute position of chunk in file
+  index_entry.offset   -= current_chunk_info_->pos;
+  // Adjust for the chunk header
+  index_entry.offset   -= 4;  // Length of the header
+  index_entry.offset   -= kchunk_header_length_;
+  // Adjust for the message header
+  index_entry.offset   -= 4;  // Length of the header
   index_entry.offset   -= message_header_len;
-  index_entry.offset   -= chunk_header_len;
-  // Adjust for 3x 4-byte lengths (the two headers and the data)
-  index_entry.offset   -= (3 * 4);
+  // Adjust for the length of the chunk data
+  index_entry.offset   -= 4;
 
-  std::map<uint32_t, std::multiset<rosbag::IndexEntry>>
-    chunk_connection_indexes;
-
-  auto &chunk_connection_index = chunk_connection_indexes[connection_info->id];
+  auto &chunk_connection_index = \
+    current_chunk_connection_indexes_[connection_info->id];
   chunk_connection_index.insert(chunk_connection_index.end(), index_entry);
   auto &connection_index = connection_indexes_[connection_info->id];
   connection_index.insert(connection_index.end(), index_entry);
 
   // Increment the connection count
-  chunk_info.connection_counts[connection_info->id]++;
+  current_chunk_info_->connection_counts[connection_info->id]++;
 
   // Write the size of the data
   impl::write_to_buffer(chunk_buffer_, message_data_len, 4);
 
-  // Go ahead and create the end of the chunk
-  VectorBuffer chunk_end_buffer;
-  finish_chunk(chunk_end_buffer, chunk_connection_indexes);
-
-  // Now calculate the final size of the chunk
-  //   Start with the current total offset
-  size_t chunk_size = file_->get_offset() + chunk_buffer_.size();
-  //   Add the message length for the predicted chunk size
-  chunk_size += message_data_len;
-  //   Adjust for the position of the chunk in the file
-  chunk_size -= chunk_info.pos;
-  //   Adjust for chunk header's length
-  chunk_size -= chunk_header_len;
-  //   Adjust for length values of the header and the data
-  chunk_size -= 4;
-  chunk_size -= 4;
-  // Then replace the place-holder chunk header
-  VectorBuffer header_buffer;
-  write_chunk_header(header_buffer, chunk_size, chunk_size);
-  std::copy(header_buffer.begin(), header_buffer.end(),
-            chunk_buffer_.begin() + chunk_start_pos_in_buffer);
+  VectorBuffer chunk_end_buffer;  // Only used if finishing chunk
+  if (should_finish_chunk)
+  {
+    /** The steps to "finish a chunk":
+     * 1. Calculate the chunk size
+     * 2. Write the post chunk items (indexes)
+     * 3. Overwrite the phony chunk header with the actual one
+     * 4. Write all chunk data (header, connections, messages)
+     * 5. Write "post" chunk items
+     */
+    // Calculate the final size of the chunk
+    //   Start with the current total offset
+    size_t chunk_size = file_->get_offset() + chunk_buffer_.size();
+    //   Add the message length for the predicted chunk size
+    chunk_size += message_data_len;
+    //   Adjust for the position of the chunk in the file
+    chunk_size -= current_chunk_info_->pos;
+    //   Adjust for chunk header's length
+    chunk_size -= kchunk_header_length_;
+    //   Adjust for length values of the header and the data
+    chunk_size -= 4;
+    chunk_size -= 4;
+    // Go ahead and create the end of the chunk
+    write_chunk_end(chunk_end_buffer, current_chunk_connection_indexes_);
+    current_chunk_connection_indexes_.clear();
+    // Then replace the place-holder chunk header
+    VectorBuffer header_buffer;
+    write_chunk_header(header_buffer, chunk_size, chunk_size);
+    std::copy(header_buffer.begin(), header_buffer.end(),
+              chunk_buffer_.begin() + current_chunk_position_);
+  }
 
   if (has_direct_data<T>())
   {
@@ -634,16 +729,21 @@ DirectBag::write(std::string const& topic, ros::Time const& time, T const& msg,
     ros::serialization::OStream s(chunk_buffer_.data() + current_position,
                                   message_data_len);
     ros::serialization::serialize(s, msg);
-    file_->write_buffer(chunk_buffer_);
+    if (should_finish_chunk)
+    {
+      file_->write_buffer(chunk_buffer_);
+      chunk_buffer_.clear();
+    }
   }
-  // Write the non direct part of the message to the buffer
-  // Make sure the chunk_buffer_ is clear now
-  chunk_buffer_.clear();
 
-  // Empty the outgoing chunk
-  chunk_buffer_.insert(chunk_buffer_.end(),
-                       chunk_end_buffer.begin(), chunk_end_buffer.end());
-  chunk_infos_.push_back(chunk_info);
+  if (should_finish_chunk)
+  {
+    // Empty the outgoing chunk
+    chunk_buffer_.insert(chunk_buffer_.end(),
+                         chunk_end_buffer.begin(), chunk_end_buffer.end());
+    chunk_infos_.push_back(*current_chunk_info_);
+    current_chunk_info_.reset();
+  }
 }
 
 class BagFileException : public rosbag::BagException
