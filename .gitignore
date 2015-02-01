@@ -1,4 +1,3 @@
-*.sublime-*
+*.sublime-workspace
 build
-Makefile
 *.bag

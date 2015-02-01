@@ -25,6 +25,9 @@ namespace rosbag_direct_write
 
 #include "aligned_allocator.h"
 
+// Default chunk size.
+static const size_t kdefault_chunk_threshold = 768 * 1024;  // 768kb
+
 // Defined in dependencies header and is a shared_ptr from either boost or std
 using rosbag_direct_write::shared_ptr;
 
@@ -76,13 +79,36 @@ class ROSBAG_DIRECT_WRITE_DECL DirectBag
 {
 public:
   /// Creates a new ROS bag file, overwriting an existing one.
-  DirectBag(std::string filename);
+  DirectBag(std::string filename,
+            size_t chunk_threshold=kdefault_chunk_threshold);
   /// Creates an uninitialized DirectBag; open must be called before use.
   DirectBag();
   ~DirectBag();
 
   /// Opens a ROS bag file at the given location for writing; overwrites.
-  void open(std::string filename);
+  /**
+   * Opens a ROS bag file at the given location, overwriting any existing
+   * ROS bag file with the same name.
+   *
+   * Also optionally sets the chunk threshold.
+   * The chunk threshold is the size which when met or exceeded, prompts the
+   * close of the current chunk and start of the next one.
+   * The chunk threshold is just one of two scenarios in which a chunk will
+   * be finished.
+   * The other scenario in which chunks are finished is when ever a message
+   * which utilizes the zero-copy write optimization is written to the bag.
+   * This limitation exists because the size of the chunk must be written
+   * at the beginning of the chunk, so by writing directly to the file these
+   * messages force the size of the chunk to be determined, so no future
+   * messages can be added to the chunk.
+   *
+   * @param filename The path to the ROS bag file to be created.
+   * @param chunk_threshold The size at which chunks are closed,
+   *                        defaults to 768kb.
+   *
+   */
+  void open(std::string filename,
+            size_t chunk_threshold=kdefault_chunk_threshold);
 
   /// Writes a given data structure to the bag file.
   /**
@@ -125,6 +151,8 @@ public:
   void close();
   /// Returns true if the file is open, otherwise false.
   bool is_open() const;
+  /// Returns the size, in bytes, of the chunk threshold.
+  size_t get_chunk_threshold() const;
 
 private:
   template<class T> shared_ptr<rosbag::ConnectionInfo>
@@ -150,7 +178,12 @@ private:
   std::map<uint32_t, std::multiset<rosbag::IndexEntry> > connection_indexes_;
   std::vector<rosbag::ChunkInfo> chunk_infos_;
 
-  VectorBuffer chunk_buffer_;
+  VectorBuffer chunk_buffer_;  // Buffer for chunk data
+  size_t current_chunk_position_;  // pos of current chunk in the chunk_buffer_
+  shared_ptr<rosbag::ChunkInfo> current_chunk_info_;  // current ChunkInfo
+  std::map<uint32_t, std::multiset<rosbag::IndexEntry>>
+    current_chunk_connection_indexes_;  // Connection indexes for current chunk
+  size_t chunk_threshold_;  // Size at which chunks are ended
 
   uint32_t next_conn_id_;
 };
