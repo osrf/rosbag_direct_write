@@ -16,7 +16,7 @@
 #include "rosbag_direct_write/direct_bag.h"
 
 #include "custom_image.h"
-#include "custom_imu.h"
+#include "custom_point_stamped.h"
 
 TEST(DirectBagTestSuite, test_record_bag)
 {
@@ -118,7 +118,7 @@ TEST(DirectBagTestSuite, test_record_bag_mixed)
   __custom_image image;
   image.stamp.fromSec(ros::WallTime::now().toSec());
   image.data = rosbag_direct_write::VectorBuffer(640 * 480, 0x12);
-  __custom_imu imu;
+  __custom_point_stamped imu;
   imu.stamp.fromSec(ros::WallTime::now().toSec());
   imu.x = 1.0;
   imu.y = 2.0;

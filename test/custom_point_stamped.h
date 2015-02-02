@@ -13,26 +13,26 @@
 #endif
 
 // Custom version of geometry_msgs::PointStamped
-typedef struct __custom_imu
+typedef struct __custom_point_stamped
 {
   ros::Time stamp;
   double x;
   double y;
   double z;
-} __custom_imu;
+} __custom_point_stamped;
 
 namespace ROSBAG_DIRECT_WRITE_TEST_ROS_NAMESPACE
 {
 namespace message_traits
 {
 template<>
-struct MD5Sum<__custom_imu>
+struct MD5Sum<__custom_point_stamped>
 {
   static const char* value()
   {
     return MD5Sum<geometry_msgs::PointStamped>::value();
   }
-  static const char* value(const __custom_imu&)
+  static const char* value(const __custom_point_stamped&)
   {
     return value();
   }
@@ -44,41 +44,41 @@ struct MD5Sum<__custom_imu>
 };
 
 template<>
-struct DataType<__custom_imu>
+struct DataType<__custom_point_stamped>
 {
   static const char* value()
   {
     return DataType<geometry_msgs::PointStamped>::value();
   }
-  static const char* value(const __custom_imu&)
+  static const char* value(const __custom_point_stamped&)
   {
     return value();
   }
 };
 
 template<>
-struct Definition<__custom_imu>
+struct Definition<__custom_point_stamped>
 {
   static const char* value()
   {
     return Definition<geometry_msgs::PointStamped>::value();
   }
-  static const char* value(const __custom_imu&)
+  static const char* value(const __custom_point_stamped&)
   {
     return value();
   }
 };
 
-template<> struct HasHeader<__custom_imu> : TrueType {};
+template<> struct HasHeader<__custom_point_stamped> : TrueType {};
 } /* namespace message_traits */
 namespace serialization
 {
 template<>
-struct Serializer<__custom_imu>
+struct Serializer<__custom_point_stamped>
 {
 template<typename Stream>
   inline static void
-  write(Stream &stream, const __custom_imu& m)
+  write(Stream &stream, const __custom_point_stamped& m)
   {
     STD_MSGS_HEADER header;
     header.stamp = m.stamp;
@@ -88,7 +88,7 @@ template<typename Stream>
     stream.next(m.z);
   }
   inline static uint32_t
-  serializedLength(const __custom_imu& m)
+  serializedLength(const __custom_point_stamped& m)
   {
     geometry_msgs::PointStamped ps_msg;
     return ros::serialization::serializationLength(ps_msg);
@@ -98,9 +98,9 @@ template<typename Stream>
 } /* namespace ros */
 
 template<> void
-rosbag_direct_write::serialize_to_buffer<__custom_imu>(
+rosbag_direct_write::serialize_to_buffer<__custom_point_stamped>(
   VectorBuffer &buffer,
-  const __custom_imu &msg)
+  const __custom_point_stamped &msg)
 {
   geometry_msgs::PointStamped ps_msg;
   size_t buffer_length = ros::serialization::serializationLength(ps_msg);
