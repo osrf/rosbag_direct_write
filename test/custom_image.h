@@ -49,7 +49,7 @@ void serialize_to_buffer(VectorBuffer& buffer, const __custom_image& msg)
   ros::serialization::serialize(s, 0/* msg.height */);
   ros::serialization::serialize(s, 0/* msg.width */);
   ros::serialization::serialize(s, std::string("")/* msg.encoding */);
-  ros::serialization::serialize(s, false/* msg.is_bigendian */);
+  ros::serialization::serialize(s, (uint8_t)false/* msg.is_bigendian */);
   ros::serialization::serialize(s, 1/* msg.step */);
   // Write the size of the data which comes next in serialize_to_file
   impl::write_to_buffer(buffer, msg.data.size(), 4);
