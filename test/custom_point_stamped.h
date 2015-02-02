@@ -90,6 +90,7 @@ template<typename Stream>
   inline static uint32_t
   serializedLength(const __custom_point_stamped& m)
   {
+    UNUSED(m);
     geometry_msgs::PointStamped ps_msg;
     return ros::serialization::serializationLength(ps_msg);
   }
