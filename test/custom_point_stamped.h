@@ -98,8 +98,10 @@ template<typename Stream>
 } /* namespace serialization */
 } /* namespace ros */
 
+namespace rosbag_direct_write
+{
 template<> void
-rosbag_direct_write::serialize_to_buffer<__custom_point_stamped>(
+serialize_to_buffer<__custom_point_stamped>(
   VectorBuffer &buffer,
   const __custom_point_stamped &msg)
 {
@@ -118,3 +120,4 @@ rosbag_direct_write::serialize_to_buffer<__custom_point_stamped>(
   ros::serialization::serialize(s, msg.y);
   ros::serialization::serialize(s, msg.z);
 }
+} /* namespace rosbag_direct_write */
