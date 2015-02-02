@@ -1,7 +1,16 @@
 #include <rosbag/bag.h>
 #include <sensor_msgs/Image.h>
+#include <std_msgs/Header.h>
 
 #include "rosbag_direct_write/direct_bag.h"
+
+#ifndef STD_MSGS_HEADER
+#define STD_MSGS_HEADER std_msgs::Header
+#endif
+
+#ifndef ROSBAG_DIRECT_WRITE_TEST_ROS_NAMESPACE
+#define ROSBAG_DIRECT_WRITE_TEST_ROS_NAMESPACE ros
+#endif
 
 // Custom version of sensor_msgs::Image
 typedef struct __custom_image
@@ -10,19 +19,17 @@ typedef struct __custom_image
   rosbag_direct_write::VectorBuffer data;
 } __custom_image;
 
-template<> bool
-rosbag_direct_write::has_direct_data<__custom_image>()
-{
+namespace rosbag_direct_write {
+template <>
+bool has_direct_data<__custom_image>() {
   return true;
 }
 
 static const size_t ksize_of_empty_image_message = \
   ros::serialization::serializationLength(sensor_msgs::Image());
 
-template<> void
-rosbag_direct_write::serialize_to_buffer(
-  VectorBuffer &buffer,
-  const __custom_image &msg)
+template <>
+void serialize_to_buffer(VectorBuffer& buffer, const __custom_image& msg)
 {
   // Calculate how much additional buffer we will need for the message
   size_t needed_buffer = ksize_of_empty_image_message;
@@ -36,7 +43,7 @@ rosbag_direct_write::serialize_to_buffer(
   // Create a OStream
   ros::serialization::OStream s(buffer.data() + start_offset, needed_buffer);
   // Write out everything but image data
-  std_msgs::Header header;
+  STD_MSGS_HEADER header;
   header.stamp = msg.stamp;
   ros::serialization::serialize(s, header);
   ros::serialization::serialize(s, 0/* msg.height */);
@@ -48,17 +55,16 @@ rosbag_direct_write::serialize_to_buffer(
   impl::write_to_buffer(buffer, msg.data.size(), 4);
 }
 
-template<> void
-rosbag_direct_write::serialize_to_file(
-  DirectFile &file,
-  const __custom_image &msg)
+template <>
+void serialize_to_file(DirectFile& file, const __custom_image& msg)
 {
   assert((file.get_offset() % 4096) == 0);
   // Write the data directly to the file from the memory
   file.write_data(msg.data.data(), msg.data.size());
 }
+} /* namespace rosbag_direct_write */
 
-namespace ros
+namespace ROSBAG_DIRECT_WRITE_TEST_ROS_NAMESPACE
 {
 namespace message_traits
 {
@@ -117,6 +123,8 @@ template<typename Stream>
   inline static void
   write(Stream &stream, const __custom_image& m)
   {
+    UNUSED(stream);
+    UNUSED(m);
     throw std::runtime_error("write shouldn't get called");
   }
   inline static uint32_t

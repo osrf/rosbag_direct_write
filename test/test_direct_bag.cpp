@@ -11,6 +11,7 @@
 #include <rosbag/view.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/Imu.h>
+#include <std_msgs/Header.h>
 
 #include "rosbag_direct_write/direct_bag.h"
 

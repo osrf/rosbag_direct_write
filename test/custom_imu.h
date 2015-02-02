@@ -2,6 +2,15 @@
 #include <geometry_msgs/PointStamped.h>
 
 #include "rosbag_direct_write/direct_bag.h"
+#include <std_msgs/Header.h>
+
+#ifndef STD_MSGS_HEADER
+#define STD_MSGS_HEADER std_msgs::Header
+#endif
+
+#ifndef ROSBAG_DIRECT_WRITE_TEST_ROS_NAMESPACE
+#define ROSBAG_DIRECT_WRITE_TEST_ROS_NAMESPACE ros
+#endif
 
 // Custom version of geometry_msgs::PointStamped
 typedef struct __custom_imu
@@ -12,7 +21,7 @@ typedef struct __custom_imu
   double z;
 } __custom_imu;
 
-namespace ros
+namespace ROSBAG_DIRECT_WRITE_TEST_ROS_NAMESPACE
 {
 namespace message_traits
 {
@@ -71,7 +80,7 @@ template<typename Stream>
   inline static void
   write(Stream &stream, const __custom_imu& m)
   {
-    std_msgs::Header header;
+    STD_MSGS_HEADER header;
     header.stamp = m.stamp;
     stream.next(header);
     stream.next(m.x);
@@ -101,7 +110,7 @@ rosbag_direct_write::serialize_to_buffer<__custom_imu>(
   // Create a OStream
   ros::serialization::OStream s(buffer.data() + start_offset, buffer_length);
   // Write out everything but image data
-  std_msgs::Header header;
+  STD_MSGS_HEADER header;
   header.stamp = msg.stamp;
   ros::serialization::serialize(s, header);
   ros::serialization::serialize(s, msg.x);
