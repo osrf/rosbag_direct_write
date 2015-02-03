@@ -19,7 +19,8 @@ typedef struct __custom_image
   rosbag_direct_write::VectorBuffer data;
 } __custom_image;
 
-namespace rosbag_direct_write {
+namespace rosbag_direct_write
+{
 template <>
 bool has_direct_data<__custom_image>() {
   return true;
