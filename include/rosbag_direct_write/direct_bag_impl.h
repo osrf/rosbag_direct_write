@@ -26,10 +26,6 @@
 
 #include "direct_bag.h"
 
-#ifndef UNUSED
-#define UNUSED(x) (void)(x)
-#endif
-
 namespace rosbag_direct_write
 {
 
@@ -529,35 +525,6 @@ write_data_message_record_header_with_padding(
   return header_len;
 }
 
-template<class T> bool
-has_direct_data()
-{
-  return false;
-}
-
-class not_implemented_exception : public std::logic_error
-{
-public:
-  explicit not_implemented_exception(const char * what_arg)
-  : std::logic_error(what_arg) {}
-};
-
-template<class T> void
-serialize_to_buffer(VectorBuffer &buffer, const T &msg)
-{
-  UNUSED(buffer);
-  UNUSED(msg);
-  throw not_implemented_exception("serialize_to_buffer not implemented");
-}
-
-template<class T> void
-serialize_to_file(DirectFile &file, const T &msg)
-{
-  UNUSED(file);
-  UNUSED(msg);
-  throw not_implemented_exception("serialize_to_file not implemented");
-}
-
 size_t
 start_chunk(VectorBuffer &buffer,
             shared_ptr<rosbag::ChunkInfo> &chunk_info,
@@ -712,14 +679,29 @@ DirectBag::write(std::string const& topic, ros::Time const& time, T const& msg,
 
   if (has_direct_data<T>())
   {
-    // It has a direct write field in the message
-    // Write the non-direct part to the buffer
-    serialize_to_buffer<T>(chunk_buffer_, msg);
-    // Write out the buffer
-    file_->write_buffer(chunk_buffer_);
-    chunk_buffer_.clear();
-    // Now write the direct stuff
-    serialize_to_file<T>(*file_, msg);
+    SerializationReturnCode ret_code = \
+      SerializationReturnCode::SERIALIZE_TO_BUFFER_NEXT;
+    size_t step = 0;
+    while (ret_code != SerializationReturnCode::DONE)
+    {
+      switch (ret_code)
+      {
+        case SerializationReturnCode::SERIALIZE_TO_BUFFER_NEXT:
+          ret_code = serialize_to_buffer<T>(chunk_buffer_, msg, step);
+          break;
+        case SerializationReturnCode::SERIALIZE_TO_FILE_NEXT:
+          // First flush the chunk_buffer_ to the file
+          file_->write_buffer(chunk_buffer_);
+          chunk_buffer_.clear();
+          // Then allow the user to write directly to the file
+          ret_code = serialize_to_file<T>(*file_, msg, step);
+          break;
+        case SerializationReturnCode::DONE:
+          // Should not happen.
+          break;
+      }
+      step += 1;
+    }
   }
   else
   {

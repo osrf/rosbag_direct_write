@@ -19,7 +19,8 @@ typedef struct __custom_image
   rosbag_direct_write::VectorBuffer data;
 } __custom_image;
 
-namespace rosbag_direct_write {
+namespace rosbag_direct_write
+{
 template <>
 bool has_direct_data<__custom_image>() {
   return true;
@@ -28,8 +29,9 @@ bool has_direct_data<__custom_image>() {
 static const size_t ksize_of_empty_image_message = \
   ros::serialization::serializationLength(sensor_msgs::Image());
 
-template <>
-void serialize_to_buffer(VectorBuffer& buffer, const __custom_image& msg)
+template <> SerializationReturnCode
+serialize_to_buffer(VectorBuffer& buffer, const __custom_image& msg,
+                    size_t step)
 {
   // Calculate how much additional buffer we will need for the message
   size_t needed_buffer = ksize_of_empty_image_message;
@@ -53,14 +55,16 @@ void serialize_to_buffer(VectorBuffer& buffer, const __custom_image& msg)
   ros::serialization::serialize(s, 1/* msg.step */);
   // Write the size of the data which comes next in serialize_to_file
   impl::write_to_buffer(buffer, msg.data.size(), 4);
+  return SerializationReturnCode::SERIALIZE_TO_FILE_NEXT;
 }
 
-template <>
-void serialize_to_file(DirectFile& file, const __custom_image& msg)
+template <> SerializationReturnCode
+serialize_to_file(DirectFile& file, const __custom_image& msg, size_t step)
 {
   assert((file.get_offset() % 4096) == 0);
   // Write the data directly to the file from the memory
   file.write_data(msg.data.data(), msg.data.size());
+  return SerializationReturnCode::DONE;
 }
 } /* namespace rosbag_direct_write */
 
@@ -123,8 +127,8 @@ template<typename Stream>
   inline static void
   write(Stream &stream, const __custom_image& m)
   {
-    UNUSED(stream);
-    UNUSED(m);
+    ROSBAG_DIRECT_WRITE_UNUSED(stream);
+    ROSBAG_DIRECT_WRITE_UNUSED(m);
     throw std::runtime_error("write shouldn't get called");
   }
   inline static uint32_t

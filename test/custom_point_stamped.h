@@ -90,34 +90,10 @@ template<typename Stream>
   inline static uint32_t
   serializedLength(const __custom_point_stamped& m)
   {
-    UNUSED(m);
+    ROSBAG_DIRECT_WRITE_UNUSED(m);
     geometry_msgs::PointStamped ps_msg;
     return ros::serialization::serializationLength(ps_msg);
   }
 };
 } /* namespace serialization */
 } /* namespace ros */
-
-namespace rosbag_direct_write
-{
-template<> void
-serialize_to_buffer<__custom_point_stamped>(
-  VectorBuffer &buffer,
-  const __custom_point_stamped &msg)
-{
-  geometry_msgs::PointStamped ps_msg;
-  size_t buffer_length = ros::serialization::serializationLength(ps_msg);
-  // Save currect buffer position and resize
-  size_t start_offset = buffer.size();
-  buffer.resize(buffer.size() + buffer_length);
-  // Create a OStream
-  ros::serialization::OStream s(buffer.data() + start_offset, buffer_length);
-  // Write out everything but image data
-  STD_MSGS_HEADER header;
-  header.stamp = msg.stamp;
-  ros::serialization::serialize(s, header);
-  ros::serialization::serialize(s, msg.x);
-  ros::serialization::serialize(s, msg.y);
-  ros::serialization::serialize(s, msg.z);
-}
-} /* namespace rosbag_direct_write */

@@ -11,10 +11,13 @@
 #include <rosbag/view.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/Imu.h>
+#include <sensor_msgs/PointCloud2.h>
+#include <sensor_msgs/PointField.h>
 #include <std_msgs/Header.h>
 
 #include "rosbag_direct_write/direct_bag.h"
 
+#include "direct_PointCloud2.h"
 #include "custom_image.h"
 #include "custom_point_stamped.h"
 
@@ -165,6 +168,59 @@ TEST(DirectBagTestSuite, test_record_bag_mixed)
   ASSERT_EQ(number_of_iterations * number_of_imu_per_iteration,
             number_of_imu_messages);
   ASSERT_EQ(number_of_iterations, number_of_image_messages);
+  ros_bag.close();
+}
+
+TEST(DirectBagTestSuite, test_record_complex_messages)
+{
+  std::string bag_name = "test_direct_complex_messages.bag";
+  rosbag_direct_write::DirectBag bag(bag_name);
+  size_t number_of_iterations = 10;
+  using rosbag_direct_write::aligned_allocator;
+  sensor_msgs::PointCloud2_<aligned_allocator<uint8_t, 4096>> pc2;
+  pc2.header.stamp.fromSec(ros::WallTime::now().toSec());
+  pc2.height = 1;  // Unordered
+  pc2.width = 640 * 480;
+  sensor_msgs::PointField_<aligned_allocator<uint8_t, 4096>> pc2_field;
+  pc2_field.name = "position";
+  pc2_field.offset = 0;
+  pc2_field.datatype = sensor_msgs::PointField::UINT32;
+  pc2_field.count = 3;
+  pc2.fields.push_back(pc2_field);
+  pc2.is_bigendian = false;
+  pc2.point_step = sizeof(uint32_t) * pc2_field.count;
+  pc2.row_step = pc2.point_step * pc2.width;
+  {
+    rosbag_direct_write::VectorBuffer data(pc2.row_step * pc2.height, 0x20);
+    pc2.data.swap(data);
+  }
+  for (size_t i = 0; i < number_of_iterations; ++i)
+  {
+    pc2.header.stamp.fromSec(ros::WallTime::now().toSec());
+
+    bag.write("points", pc2.header.stamp, pc2);
+  }
+  bag.close();
+  // Read bag with normal rosbag interface
+  rosbag::Bag ros_bag;
+  ros_bag.open(bag_name, rosbag::bagmode::Read);
+  std::vector<std::string> topics;
+  topics.push_back(std::string("points"));
+  rosbag::View view(ros_bag, rosbag::TopicQuery(topics));
+  size_t number_of_imu_messages = 0;
+  size_t number_of_pc2_messages = 0;
+  for (auto &m : view)
+  {
+    auto pc2_msg = m.instantiate<sensor_msgs::PointCloud2>();
+    ASSERT_TRUE(pc2_msg != nullptr);
+    ASSERT_EQ(pc2.height, pc2_msg->height);
+    ASSERT_EQ(pc2.width, pc2_msg->width);
+    ASSERT_EQ(pc2.fields.size(), pc2_msg->fields.size());
+    ASSERT_STREQ(pc2.fields[0].name.c_str(), pc2_msg->fields[0].name.c_str());
+    ASSERT_EQ(pc2.data.size(), pc2_msg->data.size());
+    number_of_pc2_messages += 1;
+  }
+  ASSERT_EQ(number_of_iterations, number_of_pc2_messages);
   ros_bag.close();
 }
 
