@@ -21,6 +21,7 @@
 #include <stdexcept>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <cassert>
 
 #include <rosbag_direct_write/direct_bag_impl_dependencies.h>
 
