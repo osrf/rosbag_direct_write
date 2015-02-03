@@ -693,6 +693,7 @@ DirectBag::write(std::string const& topic, ros::Time const& time, T const& msg,
           // First flush the chunk_buffer_ to the file
           file_->write_buffer(chunk_buffer_);
           chunk_buffer_.clear();
+          assert(((file_->get_offset() + chunk_buffer_.size()) % 4096) == 0);
           // Then allow the user to write directly to the file
           ret_code = serialize_to_file<T>(*file_, msg, step);
           break;

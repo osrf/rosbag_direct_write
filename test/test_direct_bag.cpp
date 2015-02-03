@@ -204,6 +204,7 @@ TEST(DirectBagTestSuite, test_record_complex_messages)
   // Read bag with normal rosbag interface
   rosbag::Bag ros_bag;
   ros_bag.open(bag_name, rosbag::bagmode::Read);
+  ASSERT_EQ(ros_bag.chunk_count_, number_of_iterations);
   std::vector<std::string> topics;
   topics.push_back(std::string("points"));
   rosbag::View view(ros_bag, rosbag::TopicQuery(topics));

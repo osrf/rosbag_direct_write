@@ -60,7 +60,8 @@ serialize_to_buffer(VectorBuffer& buffer, const sensor_msgs::PointCloud2& msg,
       throw std::runtime_error(
         "serialize_to_buffer<sensor_msgs::PointCloud2> called out of order.");
   }
-  return SerializationReturnCode::SERIALIZE_TO_FILE_NEXT;
+  // This should not occur
+  return SerializationReturnCode::DONE;
 }
 
 template <> SerializationReturnCode
