@@ -176,6 +176,7 @@ TEST(DirectBagTestSuite, test_record_complex_messages)
   std::string bag_name = "test_direct_complex_messages.bag";
   rosbag_direct_write::DirectBag bag(bag_name);
   size_t number_of_iterations = 10;
+  size_t number_of_imu_per_iteration = 10;
   using rosbag_direct_write::aligned_allocator;
   sensor_msgs::PointCloud2_<aligned_allocator<uint8_t, 4096>> pc2;
   pc2.header.stamp.fromSec(ros::WallTime::now().toSec());
@@ -194,8 +195,19 @@ TEST(DirectBagTestSuite, test_record_complex_messages)
     rosbag_direct_write::VectorBuffer data(pc2.row_step * pc2.height, 0x20);
     pc2.data.swap(data);
   }
+  __custom_point_stamped imu;
+  imu.stamp.fromSec(ros::WallTime::now().toSec());
+  imu.x = 1.0;
+  imu.y = 2.0;
+  imu.z = 3.0;
   for (size_t i = 0; i < number_of_iterations; ++i)
   {
+    for (size_t j = 0; j < number_of_imu_per_iteration; ++j)
+    {
+      imu.stamp.fromSec(ros::WallTime::now().toSec());
+
+      bag.write("point_stamped", imu.stamp, imu);
+    }
     pc2.header.stamp.fromSec(ros::WallTime::now().toSec());
 
     bag.write("points", pc2.header.stamp, pc2);
@@ -213,13 +225,25 @@ TEST(DirectBagTestSuite, test_record_complex_messages)
   for (auto &m : view)
   {
     auto pc2_msg = m.instantiate<sensor_msgs::PointCloud2>();
-    ASSERT_TRUE(pc2_msg != nullptr);
-    ASSERT_EQ(pc2.height, pc2_msg->height);
-    ASSERT_EQ(pc2.width, pc2_msg->width);
-    ASSERT_EQ(pc2.fields.size(), pc2_msg->fields.size());
-    ASSERT_STREQ(pc2.fields[0].name.c_str(), pc2_msg->fields[0].name.c_str());
-    ASSERT_EQ(pc2.data.size(), pc2_msg->data.size());
-    number_of_pc2_messages += 1;
+    auto imu_msg = m.instantiate<geometry_msgs::PointStamped>();
+    ASSERT_TRUE(pc2_msg != nullptr || imu_msg != nullptr);
+    if (pc2_msg != nullptr)
+    {
+      ASSERT_EQ(pc2.height, pc2_msg->height);
+      ASSERT_EQ(pc2.width, pc2_msg->width);
+      ASSERT_EQ(pc2.fields.size(), pc2_msg->fields.size());
+      ASSERT_STREQ(pc2.fields[0].name.c_str(),
+                   pc2_msg->fields[0].name.c_str());
+      ASSERT_EQ(pc2.data.size(), pc2_msg->data.size());
+      number_of_pc2_messages += 1;
+    }
+    if (imu_msg != nullptr)
+    {
+      ASSERT_EQ(imu_msg->point.x, 1);
+      ASSERT_EQ(imu_msg->point.y, 2);
+      ASSERT_EQ(imu_msg->point.z, 3);
+      number_of_imu_messages += 1;
+    }
   }
   ASSERT_EQ(number_of_iterations, number_of_pc2_messages);
   ros_bag.close();
