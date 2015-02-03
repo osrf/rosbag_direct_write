@@ -26,10 +26,6 @@
 
 #include "direct_bag.h"
 
-#ifndef UNUSED
-#define UNUSED(x) (void)(x)
-#endif
-
 namespace rosbag_direct_write
 {
 
@@ -527,35 +523,6 @@ write_data_message_record_header_with_padding(
   std::copy(temp.begin(), temp.end(), buffer.begin() + buffer_starting_offset);
   // Return the new length
   return header_len;
-}
-
-template<class T> bool
-has_direct_data()
-{
-  return false;
-}
-
-class not_implemented_exception : public std::logic_error
-{
-public:
-  explicit not_implemented_exception(const char * what_arg)
-  : std::logic_error(what_arg) {}
-};
-
-template<class T> void
-serialize_to_buffer(VectorBuffer &buffer, const T &msg)
-{
-  UNUSED(buffer);
-  UNUSED(msg);
-  throw not_implemented_exception("serialize_to_buffer not implemented");
-}
-
-template<class T> void
-serialize_to_file(DirectFile &file, const T &msg)
-{
-  UNUSED(file);
-  UNUSED(msg);
-  throw not_implemented_exception("serialize_to_file not implemented");
 }
 
 size_t

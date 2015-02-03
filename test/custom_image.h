@@ -123,8 +123,8 @@ template<typename Stream>
   inline static void
   write(Stream &stream, const __custom_image& m)
   {
-    UNUSED(stream);
-    UNUSED(m);
+    ROSBAG_DIRECT_WRITE_UNUSED(stream);
+    ROSBAG_DIRECT_WRITE_UNUSED(m);
     throw std::runtime_error("write shouldn't get called");
   }
   inline static uint32_t

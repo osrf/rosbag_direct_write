@@ -188,6 +188,42 @@ private:
   uint32_t next_conn_id_;
 };
 
+/// Macro used to prevent compiler warnings, should optimize out.
+#define ROSBAG_DIRECT_WRITE_UNUSED(x) (void)(x)
+
+/// Default template to indicate if a message type will use direct data or not.
+template<class T> bool
+has_direct_data()
+{
+  return false;
+}
+
+/// Exception which is raised when a default serialize function is used.
+class not_implemented_exception : public std::logic_error
+{
+public:
+  explicit not_implemented_exception(const char * what_arg)
+  : std::logic_error(what_arg) {}
+};
+
+/// Default serialize_to_buffer template function, should always be overridden.
+template<class T> void
+serialize_to_buffer(VectorBuffer &buffer, const T &msg)
+{
+  ROSBAG_DIRECT_WRITE_UNUSED(buffer);
+  ROSBAG_DIRECT_WRITE_UNUSED(msg);
+  throw not_implemented_exception("serialize_to_buffer not implemented");
+}
+
+/// Default serialize_to_file template function, should always be overridden.
+template<class T> void
+serialize_to_file(DirectFile &file, const T &msg)
+{
+  ROSBAG_DIRECT_WRITE_UNUSED(file);
+  ROSBAG_DIRECT_WRITE_UNUSED(msg);
+  throw not_implemented_exception("serialize_to_file not implemented");
+}
+
 } // namespace rosbag_direct_write
 
 #include "direct_bag_impl.h"
