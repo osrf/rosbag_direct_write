@@ -206,22 +206,35 @@ public:
   : std::logic_error(what_arg) {}
 };
 
+enum class SerializationReturnCode
+{
+  DONE,
+  SERIALIZE_TO_BUFFER_NEXT,
+  SERIALIZE_TO_FILE_NEXT,
+};
+
 /// Default serialize_to_buffer template function, should always be overridden.
-template<class T> void
-serialize_to_buffer(VectorBuffer &buffer, const T &msg)
+template<class T> SerializationReturnCode
+serialize_to_buffer(VectorBuffer &buffer, const T &msg,
+                    size_t serialization_step)
 {
   ROSBAG_DIRECT_WRITE_UNUSED(buffer);
   ROSBAG_DIRECT_WRITE_UNUSED(msg);
+  ROSBAG_DIRECT_WRITE_UNUSED(serialization_step);
   throw not_implemented_exception("serialize_to_buffer not implemented");
+  return SerializationReturnCode::DONE;
 }
 
 /// Default serialize_to_file template function, should always be overridden.
-template<class T> void
-serialize_to_file(DirectFile &file, const T &msg)
+template<class T> SerializationReturnCode
+serialize_to_file(DirectFile &file, const T &msg,
+                  size_t serialization_step)
 {
   ROSBAG_DIRECT_WRITE_UNUSED(file);
   ROSBAG_DIRECT_WRITE_UNUSED(msg);
+  ROSBAG_DIRECT_WRITE_UNUSED(serialization_step);
   throw not_implemented_exception("serialize_to_file not implemented");
+  return SerializationReturnCode::DONE;
 }
 
 } // namespace rosbag_direct_write

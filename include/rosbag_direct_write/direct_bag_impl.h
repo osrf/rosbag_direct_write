@@ -679,14 +679,29 @@ DirectBag::write(std::string const& topic, ros::Time const& time, T const& msg,
 
   if (has_direct_data<T>())
   {
-    // It has a direct write field in the message
-    // Write the non-direct part to the buffer
-    serialize_to_buffer<T>(chunk_buffer_, msg);
-    // Write out the buffer
-    file_->write_buffer(chunk_buffer_);
-    chunk_buffer_.clear();
-    // Now write the direct stuff
-    serialize_to_file<T>(*file_, msg);
+    SerializationReturnCode ret_code = \
+      SerializationReturnCode::SERIALIZE_TO_BUFFER_NEXT;
+    size_t step = 0;
+    while (ret_code != SerializationReturnCode::DONE)
+    {
+      switch (ret_code)
+      {
+        case SerializationReturnCode::SERIALIZE_TO_BUFFER_NEXT:
+          ret_code = serialize_to_buffer<T>(chunk_buffer_, msg, step);
+          break;
+        case SerializationReturnCode::SERIALIZE_TO_FILE_NEXT:
+          // First flush the chunk_buffer_ to the file
+          file_->write_buffer(chunk_buffer_);
+          chunk_buffer_.clear();
+          // Then allow the user to write directly to the file
+          ret_code = serialize_to_file<T>(*file_, msg, step);
+          break;
+        case SerializationReturnCode::DONE:
+          // Should not happen.
+          break;
+      }
+      step += 1;
+    }
   }
   else
   {
