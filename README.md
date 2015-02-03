@@ -147,9 +147,10 @@ The number `4096` is the typical page size for most systems you will encounter.
 
 The user is responsible for ensuring these constraints are met.
 To ensure that the `DirectFile`'s offset is a multiple of `4096`, `rosbag_direct_write` will make sure that the last message in a chunk ends on a `4096` boundary.
+This is accomplished by using a bogus message header entry to adjust the start of the last message in the chunk to be exactly the length of the last message short of a `4096` boundary.
 
 At this point it is worth mentioning the other special condition for ending chunks in `rosbag_direct_write`'s implementation.
-Normally, a chunk is only ended if the chunk threshold is reached or if the rosbag is closed, but in `rosbag_direct_write` they are additionally be finished any time a direct write message has been written.
+Normally, a chunk is only ended if the chunk threshold is reached or if the rosbag is closed, but in `rosbag_direct_write` they are additionally finished anytime a direct write message has been written.
 This requirement is in place to allow direct messages to end on a `4096` boundary, allowing the user to more easily meet the above `O_DIRECT` constraints.
 
 So, if all of the user's messages are using direct write, then there will be one message per chunk.
