@@ -68,6 +68,7 @@ template <> SerializationReturnCode
 serialize_to_file(DirectFile& file, const sensor_msgs::PointCloud2& msg,
                   size_t step)
 {
+  ROSBAG_DIRECT_WRITE_UNUSED(step);
   assert((file.get_offset() % 4096) == 0);
   assert(step == 1);  // Make sure this is step 2 of 3
   // Write the data directly to the file from the memory

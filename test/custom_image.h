@@ -33,6 +33,7 @@ template <> SerializationReturnCode
 serialize_to_buffer(VectorBuffer& buffer, const __custom_image& msg,
                     size_t step)
 {
+  ROSBAG_DIRECT_WRITE_UNUSED(step);
   // Calculate how much additional buffer we will need for the message
   size_t needed_buffer = ksize_of_empty_image_message;
   // No need to subtract the size of data, since data is empty in the
@@ -61,6 +62,7 @@ serialize_to_buffer(VectorBuffer& buffer, const __custom_image& msg,
 template <> SerializationReturnCode
 serialize_to_file(DirectFile& file, const __custom_image& msg, size_t step)
 {
+  ROSBAG_DIRECT_WRITE_UNUSED(step);
   assert((file.get_offset() % 4096) == 0);
   // Write the data directly to the file from the memory
   file.write_data(msg.data.data(), msg.data.size());
