@@ -249,6 +249,148 @@ TEST(DirectBagTestSuite, test_record_complex_messages)
   ros_bag.close();
 }
 
+TEST(DirectBagCollectionTestSuite, test_one_bag)
+{
+  std::string folder_name = "test_one_bag/a/b/c";
+  rosbag_direct_write::DirectBagCollection bag;
+  bag.open_directory(folder_name, "foo");
+  size_t number_of_iterations = 1;
+  size_t width = 320, height = 200;
+  sensor_msgs::Image image;
+  image.header.stamp.fromSec(ros::WallTime::now().toSec());
+  image.header.frame_id = "/camera_frame";
+  image.height = height;
+  image.width = width;
+  image.encoding = "Encoding 1";
+  image.is_bigendian = true;
+  image.step = 1;
+  image.data = std::vector<uint8_t>(width * height, 0x12);
+  for (size_t i = 0; i < number_of_iterations; ++i)
+  {
+    image.header.stamp.fromSec(ros::WallTime::now().toSec());
+
+    bag.write("camera", image.header.stamp, image);
+  }
+  auto bag_files = bag.close();
+  ASSERT_EQ(bag_files.size(), 1);
+  ASSERT_EQ(bag_files[0], folder_name + '/' + std::string("foo-0001.bag"));
+  // Read bag with normal rosbag interface
+  std::vector<rosbag_direct_write::shared_ptr<rosbag::Bag>> bags;
+  std::vector<std::string> topics;
+  topics.push_back(std::string("camera"));
+  rosbag::View view;
+  rosbag::TopicQuery topic_query(topics);
+  for (auto &bag_file : bag_files)
+  {
+    bags.emplace_back(new rosbag::Bag(bag_file, rosbag::bagmode::Read));
+    view.addQuery(*bags.back(), topic_query);
+  }
+  size_t number_of_images = 0;
+  for (auto &m : view)
+  {
+    ASSERT_STREQ("camera", m.getTopic().c_str());
+    auto msg = m.instantiate<sensor_msgs::Image>();
+    ASSERT_NE(nullptr, msg);
+    ASSERT_STREQ("/camera_frame", msg->header.frame_id.c_str());
+    ASSERT_EQ(width, msg->width);
+    ASSERT_EQ(height, msg->height);
+    ASSERT_STREQ("Encoding 1", msg->encoding.c_str());
+    ASSERT_TRUE(msg->is_bigendian);
+    ASSERT_EQ(1, msg->step);
+    ASSERT_EQ(width * height, msg->data.size());
+    for (auto &e : msg->data)
+    {
+      ASSERT_EQ(0x12, e);
+    }
+    number_of_images += 1;
+  }
+  ASSERT_EQ(number_of_iterations, number_of_images);
+  for (auto &rosbag : bags)
+  {
+    rosbag->close();
+  }
+}
+
+TEST(DirectBagCollectionTestSuite, test_open_directory)
+{
+  std::string folder_name = "test_open_directory/a/b/c";
+  rosbag_direct_write::DirectBagCollection bag;
+  bag.open_directory(
+    folder_name,  // Folder to put bags in
+    "",           // Prefix for bag file names
+    4096,         // 4096KB chunk threshold
+    256 * 1024,   // 256KB bag file size threshold
+    3             // Width of number suffix, e.g. 001.bag, 002.bag, ...
+  );
+  size_t number_of_iterations = 3;
+  // A 1024 x 768 image should be more than enough to close the bag file
+  size_t width = 1024, height = 768;
+  sensor_msgs::Image image;
+  image.header.stamp.fromSec(ros::WallTime::now().toSec());
+  image.header.frame_id = "/camera_frame";
+  image.height = height;
+  image.width = width;
+  image.encoding = "Encoding 1";
+  image.is_bigendian = true;
+  image.step = 1;
+  image.data = std::vector<uint8_t>(width * height, 0x12);
+  for (size_t i = 0; i < number_of_iterations; ++i)
+  {
+    image.header.stamp.fromSec(ros::WallTime::now().toSec());
+
+    bag.write("camera", image.header.stamp, image);
+  }
+  auto bag_files = bag.close();
+  ASSERT_EQ(bag_files.size(), 3);  // One bag per image message
+  ASSERT_EQ(bag_files[0], folder_name + '/' + std::string("001.bag"));
+  // Read bag with normal rosbag interface
+  std::vector<rosbag_direct_write::shared_ptr<rosbag::Bag>> bags;
+  std::vector<std::string> topics;
+  topics.push_back(std::string("camera"));
+  rosbag::View view;
+  rosbag::TopicQuery topic_query(topics);
+  for (auto &bag_file : bag_files)
+  {
+    bags.emplace_back(new rosbag::Bag(bag_file, rosbag::bagmode::Read));
+    view.addQuery(*bags.back(), topic_query);
+  }
+  size_t number_of_images = 0;
+  for (auto &m : view)
+  {
+    ASSERT_STREQ("camera", m.getTopic().c_str());
+    auto msg = m.instantiate<sensor_msgs::Image>();
+    ASSERT_NE(nullptr, msg);
+    ASSERT_STREQ("/camera_frame", msg->header.frame_id.c_str());
+    ASSERT_EQ(width, msg->width);
+    ASSERT_EQ(height, msg->height);
+    ASSERT_STREQ("Encoding 1", msg->encoding.c_str());
+    ASSERT_TRUE(msg->is_bigendian);
+    ASSERT_EQ(1, msg->step);
+    ASSERT_EQ(width * height, msg->data.size());
+    for (auto &e : msg->data)
+    {
+      ASSERT_EQ(0x12, e);
+    }
+    number_of_images += 1;
+  }
+  ASSERT_EQ(number_of_iterations, number_of_images);
+  for (auto &rosbag : bags)
+  {
+    rosbag->close();
+  }
+}
+
+TEST(DirectBagCollectionTestSuite, test_no_messages)
+{
+  std::string folder_name = "test_no_messages/a/b/c";
+  rosbag_direct_write::DirectBagCollection bag;
+  bag.open_directory(folder_name);
+  auto bag_files = bag.close();
+  ASSERT_EQ(bag_files.size(), 1);
+  rosbag::Bag ros_bag(bag_files[0], rosbag::bagmode::Read);
+  ros_bag.close();
+}
+
 int main(int argc, char **argv)
 {
   testing::InitGoogleTest(&argc, argv);

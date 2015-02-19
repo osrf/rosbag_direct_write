@@ -18,6 +18,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <sstream>
 #include <stdexcept>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -269,6 +270,11 @@ DirectBag::DirectBag()
 
 void DirectBag::open(std::string filename, size_t chunk_threshold)
 {
+  if (this->is_open())
+  {
+    throw std::runtime_error(
+      "open called on an already open DirectBag instance.");
+  }
   file_.reset(new DirectFile(filename));
   filename_ = filename;
   chunk_threshold_ = chunk_threshold;
@@ -338,7 +344,8 @@ void DirectBag::close()
   bool was_open = open_.exchange(false);
   if (!was_open)
   {
-    throw rosbag::BagException("Tried to close and already closed DirectBag.");
+    throw std::runtime_error(
+      "close called on an already closed DirectBag instance");
   }
   VectorBuffer stop_buffer;
   // Finish any open chunks
@@ -391,11 +398,50 @@ void DirectBag::close()
   file_->write_buffer(file_header_buffer);
   file_->close();
   file_.reset();
+  filename_.clear();
+  topic_connection_ids_.clear();
+  header_connection_ids_.clear();
+  connections_.clear();
+  connection_indexes_.clear();
+  chunk_infos_.clear();
+  current_chunk_position_ = 0;
+  current_chunk_info_.reset();
+  current_chunk_connection_indexes_.clear();
+  chunk_threshold_ = 0;
+  next_conn_id_ = 0;
 }
 
 bool DirectBag::is_open() const
 {
   return open_.load();
+}
+
+size_t DirectBag::get_chunk_threshold() const
+{
+  return chunk_threshold_;
+}
+
+std::string DirectBag::get_bag_file_name() const
+{
+  if (this->is_open())
+  {
+    assert(file_ != nullptr);
+    return file_->get_filename();
+  }
+  return std::string("");
+}
+
+size_t DirectBag::get_bag_file_size() const
+{
+  return file_->get_size();
+}
+
+size_t DirectBag::get_virtual_bag_size() const
+{
+  // It is ok to use get_offset here instead of get_size since
+  // we know that the file cursor stays at the end of the file
+  // except during close() where this function is not used.
+  return file_->get_offset() + chunk_buffer_.size();
 }
 
 inline size_t
@@ -499,9 +545,7 @@ write_data_message_record_header_with_padding(
                           + 4 // length of message data length
                           + serialized_message_data_len;
   size_t offset_to_4096_boundary = 4096 - (projected_offset % 4096);
-#ifndef NDEBUG
   assert((offset_to_4096_boundary + projected_offset) % 4096 == 0);
-#endif
   if (offset_to_4096_boundary == 4096)
   {
     // No alignment needed
@@ -831,6 +875,18 @@ DirectFile::seek(uint64_t pos) const
 #endif
 }
 
+size_t DirectFile::get_size() const
+{
+  size_t offset = this->get_offset();
+#if __APPLE__
+  ssize_t end_offset = fseek(file_pointer_, 0, SEEK_END);
+#else
+  off_t end_offset = lseek(file_descriptor_, 0, SEEK_END);
+#endif
+  this->seek(offset);
+  return end_offset;
+}
+
 size_t
 DirectFile::write_buffer(VectorBuffer &buffer)
 {
@@ -840,10 +896,8 @@ DirectFile::write_buffer(VectorBuffer &buffer)
 size_t
 DirectFile::write_data(const uint8_t *start, size_t length)
 {
-#ifndef NDEBUG
   assert((reinterpret_cast<uintptr_t>(start) % 4096) == 0);
   assert((length % 4096) == 0);
-#endif
 #if __APPLE__
   ssize_t ret = fwrite(start, sizeof(uint8_t), length, file_pointer_);
   if (ret < 0)
@@ -859,6 +913,233 @@ DirectFile::write_data(const uint8_t *start, size_t length)
   }
   return ret;
 #endif
+}
+
+DirectBagCollection::DirectBagCollection()
+: folder_path_(""), file_prefix_(""), chunk_threshold_(0),
+  bag_size_threshold_(0), bag_number_width_(0), open_(false),
+  current_bag_number_(0), current_bag_(nullptr)
+{}
+
+DirectBagCollection::~DirectBagCollection()
+{
+  if (this->is_open())
+  {
+    this->close();
+  }
+}
+
+inline bool directory_exists(std::string path)
+{
+  struct stat info;
+
+  if(stat(path.c_str(), &info) == 0 && info.st_mode & S_IFDIR)
+  {
+    return true;
+  }
+  else
+  {
+    return false;
+  }
+}
+
+void make_directories(std::string path)
+{
+  std::vector<std::string> directories;
+  std::stringstream ss(path);
+  std::string item;
+  while (std::getline(ss, item, '/'))
+  {
+    directories.push_back(item);
+  }
+  std::string current_path = "";
+  if (0 != path.compare(0, 1, "/"))
+  {
+    // Path doesn't start with a / and is not absolute
+    current_path = ".";
+  }
+  for (auto &directory : directories)
+  {
+    current_path += '/' + directory;
+    if (!directory_exists(current_path))
+    {
+      auto ret = mkdir(current_path.c_str(), ACCESSPERMS);
+      if (ret != 0)
+      {
+        std::string err_msg = "Failed to create directory ";
+        err_msg += current_path;
+        throw BagFileException(err_msg.c_str(), errno);
+      }
+    }
+  }
+}
+
+void DirectBagCollection::open_directory(std::string folder_path,
+                                         std::string file_prefix,
+                                         size_t chunk_threshold,
+                                         size_t bag_size_threshold,
+                                         size_t bag_number_width)
+{
+  if (this->is_open())
+  {
+    throw std::runtime_error(
+      "open called on an already open DirectBagCollection instance.");
+  }
+  folder_path_ = folder_path;
+  file_prefix_ = file_prefix;
+  chunk_threshold_ = chunk_threshold;
+  bag_size_threshold_ = bag_size_threshold;
+  bag_number_width_ = bag_number_width;
+  // Make sure the directory path exists
+  make_directories(folder_path_);
+  this->open_next_bag_();
+  open_.store(true);
+}
+
+inline std::string
+generate_bag_name(std::string folder_path, std::string file_prefix,
+                  size_t bag_number, size_t bag_number_width)
+{
+  std::stringstream ss;
+  if (folder_path != "")
+  {
+    if (0 != folder_path.compare(folder_path.length() - 1, 1, "/"))
+    {
+      folder_path += '/';
+    }
+    ss << folder_path;
+  }
+  ss << file_prefix;
+  if (file_prefix != "")
+  {
+    ss << "-";
+  }
+  ss << std::setfill('0') << std::setw(bag_number_width) << bag_number
+     << ".bag";
+  return ss.str();
+}
+
+std::vector<std::string> DirectBagCollection::close()
+{
+  bool was_open = open_.exchange(false);
+  if (!was_open)
+  {
+    throw std::runtime_error(
+      "close called on an already closed DirectBag instance");
+  }
+  // Calculate bag file names for return
+  std::vector<std::string> filenames;
+  for(size_t i = 1; i <= current_bag_number_; i++)
+  {
+    filenames.push_back(
+      generate_bag_name(folder_path_, file_prefix_,
+                        i, bag_number_width_));
+  }
+  // Clean up
+  if (current_bag_ != nullptr)
+  {
+    close_current_bag_();
+    current_bag_.reset();
+  }
+  folder_path_.clear();
+  file_prefix_.clear();
+  chunk_threshold_ = 0;
+  bag_size_threshold_ = 0;
+  bag_number_width_ = 0;
+  current_bag_number_ = 0;
+  return filenames;
+}
+
+template<typename ...Args>
+void DirectBagCollection::write(Args && ...args)
+{
+  if (current_bag_ == nullptr)
+  {
+    open_next_bag_();
+  }
+  if (this->is_open())
+  {
+    assert(current_bag_ != nullptr);
+    current_bag_->write(std::forward<Args>(args)...);
+    check_bag_threshold_();
+  }
+  else
+  {
+    throw std::runtime_error(
+      "write called on a closed DirectBagCollection instance");
+  }
+}
+
+bool DirectBagCollection::is_open() const
+{
+  return open_.load();
+}
+
+std::string DirectBagCollection::get_folder_path() const
+{
+  return folder_path_;
+}
+
+size_t DirectBagCollection::get_chunk_threshold() const
+{
+  if (!this->is_open())
+  {
+    throw std::runtime_error(
+      "get_chunk_threshold called on a closed DirectBagCollection instance");
+  }
+  assert(current_bag_ != nullptr);
+  return current_bag_->get_chunk_threshold();
+}
+
+size_t DirectBagCollection::get_bag_size_threshold() const
+{
+  return bag_size_threshold_;
+}
+
+size_t DirectBagCollection::get_current_bag_number() const
+{
+  return current_bag_number_;
+}
+
+std::string DirectBagCollection::get_current_bag_file_name() const
+{
+  if (!this->is_open())
+  {
+    throw std::runtime_error(
+      "get_current_bag_file_name called on a closed "
+      "DirectBagCollection instance");
+  }
+  assert(current_bag_ != nullptr);
+  return current_bag_->get_bag_file_name();
+}
+
+void DirectBagCollection::check_bag_threshold_()
+{
+  assert(current_bag_ != nullptr);
+  if (current_bag_->get_virtual_bag_size() >= bag_size_threshold_)
+  {
+    this->close_current_bag_();
+  }
+}
+
+void DirectBagCollection::close_current_bag_()
+{
+  assert(current_bag_ != nullptr);
+  assert(current_bag_->is_open());
+  current_bag_->close();
+  current_bag_.reset();
+}
+
+void DirectBagCollection::open_next_bag_()
+{
+  if (current_bag_ != nullptr)
+  {
+    close_current_bag_();
+  }
+  current_bag_.reset(new DirectBag(
+    generate_bag_name(folder_path_, file_prefix_,
+                      ++current_bag_number_, bag_number_width_),
+    chunk_threshold_));
 }
 
 } /* namespace rosbag_direct_write */
