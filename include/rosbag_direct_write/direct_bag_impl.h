@@ -508,9 +508,7 @@ write_data_message_record_header_with_padding(
                           + 4 // length of message data length
                           + serialized_message_data_len;
   size_t offset_to_4096_boundary = 4096 - (projected_offset % 4096);
-#ifndef NDEBUG
   assert((offset_to_4096_boundary + projected_offset) % 4096 == 0);
-#endif
   if (offset_to_4096_boundary == 4096)
   {
     // No alignment needed
@@ -849,10 +847,8 @@ DirectFile::write_buffer(VectorBuffer &buffer)
 size_t
 DirectFile::write_data(const uint8_t *start, size_t length)
 {
-#ifndef NDEBUG
   assert((reinterpret_cast<uintptr_t>(start) % 4096) == 0);
   assert((length % 4096) == 0);
-#endif
 #if __APPLE__
   ssize_t ret = fwrite(start, sizeof(uint8_t), length, file_pointer_);
   if (ret < 0)

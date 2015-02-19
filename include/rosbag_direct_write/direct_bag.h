@@ -105,7 +105,6 @@ public:
    * @param filename The path to the ROS bag file to be created.
    * @param chunk_threshold The size at which chunks are closed,
    *                        defaults to 768kb.
-   *
    */
   void open(std::string filename,
             size_t chunk_threshold=kdefault_chunk_threshold);
@@ -241,6 +240,8 @@ serialize_to_file(DirectFile &file, const T &msg,
 
 } // namespace rosbag_direct_write
 
+#ifndef ROSBAG_BAG_DIRECT_BAG_DIRECT_H_DO_NOT_INCLUDE_IMPL
 #include "direct_bag_impl.h"
+#endif
 
 #endif  /* ROSBAG_BAG_DIRECT_BAG_DIRECT_H */
