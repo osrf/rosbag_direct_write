@@ -54,7 +54,7 @@ public:
   size_t write_data(const uint8_t *start, size_t length);
 
   /// Returns the current file's name.
-  std::string get_filename() {return this->filename_;}
+  std::string get_filename() const {return this->filename_;}
 
   /// Returns true if the file is open, otherwise false.
   bool is_open();
@@ -153,6 +153,8 @@ public:
   bool is_open() const;
   /// Returns the size, in bytes, of the chunk threshold.
   size_t get_chunk_threshold() const;
+  /// Returns the bag file name, returns "" if the bag is not open.
+  std::string get_bag_file_name() const;
 
 private:
   template<class T> shared_ptr<rosbag::ConnectionInfo>

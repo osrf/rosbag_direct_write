@@ -397,6 +397,16 @@ bool DirectBag::is_open() const
   return open_.load();
 }
 
+std::string DirectBag::get_bag_file_name() const
+{
+  if (this->is_open())
+  {
+    assert(file_ != nullptr);
+    return file_->get_filename();
+  }
+  return std::string("");
+}
+
 inline size_t
 get_chunk_offset(size_t current_position, size_t chunk_data_position)
 {
