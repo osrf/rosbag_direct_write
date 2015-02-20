@@ -964,7 +964,7 @@ void make_directories(std::string path)
     current_path += '/' + directory;
     if (!directory_exists(current_path))
     {
-      auto ret = mkdir(current_path.c_str(), ACCESSPERMS);
+      auto ret = mkdir(current_path.c_str(), (S_IRWXU|S_IRWXG|S_IRWXO));
       if (ret != 0)
       {
         std::string err_msg = "Failed to create directory ";
