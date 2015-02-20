@@ -16,13 +16,14 @@
 #ifndef ROSBAG_BAG_DIRECT_BAG_DIRECT_IMPL_H
 #define ROSBAG_BAG_DIRECT_BAG_DIRECT_IMPL_H
 
+#include <cassert>
 #include <errno.h>
 #include <fcntl.h>
+#include <iomanip>
 #include <sstream>
 #include <stdexcept>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <cassert>
 
 #include <rosbag_direct_write/direct_bag_impl_dependencies.h>
 
