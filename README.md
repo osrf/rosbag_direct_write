@@ -49,9 +49,17 @@ namespace rosbag_direct_write
 {
 
 template <>
-bool has_direct_data<sensor_msgs::PointCloud2>()
+bool has_direct_data(const sensor_msgs::PointCloud2 &point_cloud)
 {
+  ROSBAG_DIRECT_WRITE_UNUSED(point_cloud);  // Prevents unused argument warning
   return true;
+}
+
+template <>
+size_t alignment_adjustment(const sensor_msgs::PointCloud2 &point_cloud)
+{
+  ROSBAG_DIRECT_WRITE_UNUSED(point_cloud);
+  return 1;  // To account for the trailing is_dense boolean.
 }
 
 template <> SerializationReturnCode
@@ -125,7 +133,7 @@ serialize_to_file(DirectFile& file, const sensor_msgs::PointCloud2& msg,
 
 Let's break that down, first the user must create the function `has_direct_data`.
 This function is used by `rosbag_direct_write` to determine if a message should be handled as a normal message and be serialized to an in-memory buffer, or if it should be treated like a direct write message.
-To use this feature, you'll need to provide a specialization of this function which returns `true`.
+To use this feature, you'll need to provide a specialization of this function which returns `true` for messages which have elements which can be written with `O_DIRECT`.
 
 Next, you'll need to define the two serialization functions `serialize_to_buffer` and `serialize_to_file`.
 `serialize_to_buffer` is always called first, but what happens next is determined by what `serialize_to_buffer` returns.
@@ -146,8 +154,10 @@ At this point it is important to note what the rules about using `O_DIRECT` are:
 The number `4096` is the typical page size for most systems you will encounter.
 
 The user is responsible for ensuring these constraints are met.
-To ensure that the `DirectFile`'s offset is a multiple of `4096`, `rosbag_direct_write` will make sure that the last message in a chunk ends on a `4096` boundary.
-This is accomplished by using a bogus message header entry to adjust the start of the last message in the chunk to be exactly the length of the last message short of a `4096` boundary.
+To ensure that the `DirectFile`'s offset is a multiple of `4096`, `rosbag_direct_write` will make sure that the last message in a chunk ends on a `4096` boundary, but this can be adjusted using the optional `alignment_adjustment` template specialization.
+This adjustment necessary when the direct written part of the message is not at the end of the message, like for PointCloud2.
+However, sensor_msgs::Image's last field is the image data and therefore does not require any adjustment to the alignment.
+Getting the alignment right is accomplished by using a bogus message header entry to adjust the start of the last message in the chunk to be exactly the length of the last message short of a `4096` boundary.
 
 At this point it is worth mentioning the other special condition for ending chunks in `rosbag_direct_write`'s implementation.
 Normally, a chunk is only ended if the chunk threshold is reached or if the rosbag is closed, but in `rosbag_direct_write` they are additionally finished anytime a direct write message has been written.

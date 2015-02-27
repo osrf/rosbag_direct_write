@@ -22,7 +22,9 @@ typedef struct __custom_image
 namespace rosbag_direct_write
 {
 template <>
-bool has_direct_data<__custom_image>() {
+bool has_direct_data(const __custom_image &msg)
+{
+  ROSBAG_DIRECT_WRITE_UNUSED(msg);
   return true;
 }
 

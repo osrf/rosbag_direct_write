@@ -319,15 +319,17 @@ private:
 
 /// Default template to indicate if a message type will use direct data or not.
 template<class T> bool
-has_direct_data()
+has_direct_data(const T& msg)
 {
+  ROSBAG_DIRECT_WRITE_UNUSED(msg);
   return false;
 }
 
 /// Default template to allow messages to adjust the alignment padding.
 template<class T> size_t
-alignment_adjustment()
+alignment_adjustment(const T& msg)
 {
+  ROSBAG_DIRECT_WRITE_UNUSED(msg);
   return 0;
 }
 

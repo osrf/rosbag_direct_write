@@ -621,7 +621,8 @@ DirectBag::write(std::string const& topic, ros::Time const& time, T const& msg,
 
   // Figure out if we should finish the chunk or not
   bool should_finish_chunk = false;
-  if (has_direct_data<T>())
+  bool has_direct_data_bool = has_direct_data<T>(msg);
+  if (has_direct_data_bool)
   {
     // Always finish a chunk before writing a direct data message
     should_finish_chunk = true;
@@ -652,7 +653,7 @@ DirectBag::write(std::string const& topic, ros::Time const& time, T const& msg,
     // If we are finishing the chunk, pad so that we write to a 4096 boundry
     message_header_len = write_data_message_record_header_with_padding(
         chunk_buffer_, connection_info->id, time, file_->get_offset(),
-        message_data_len, alignment_adjustment<T>());
+        message_data_len, alignment_adjustment<T>(msg));
   }
   else
   {
@@ -725,7 +726,7 @@ DirectBag::write(std::string const& topic, ros::Time const& time, T const& msg,
               chunk_buffer_.begin() + current_chunk_position_);
   }
 
-  if (has_direct_data<T>())
+  if (has_direct_data_bool)
   {
     SerializationReturnCode ret_code = \
       SerializationReturnCode::SERIALIZE_TO_BUFFER_NEXT;

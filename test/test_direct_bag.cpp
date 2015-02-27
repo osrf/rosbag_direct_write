@@ -177,12 +177,11 @@ TEST(DirectBagTestSuite, test_record_complex_messages)
   rosbag_direct_write::DirectBag bag(bag_name);
   size_t number_of_iterations = 10;
   size_t number_of_imu_per_iteration = 10;
-  using rosbag_direct_write::aligned_allocator;
-  sensor_msgs::PointCloud2_<aligned_allocator<uint8_t, 4096>> pc2;
+  test_direct_bag::AlignedPointCloud2 pc2;
   pc2.header.stamp.fromSec(ros::WallTime::now().toSec());
   pc2.height = 1;  // Unordered
-  pc2.width = 640 * 480;
-  sensor_msgs::PointField_<aligned_allocator<uint8_t, 4096>> pc2_field;
+  pc2.width = 2000;  // Bigger than 4096 bytes, but not a multiple on purpose.
+  sensor_msgs::PointField pc2_field;
   pc2_field.name = "position";
   pc2_field.offset = 0;
   pc2_field.datatype = sensor_msgs::PointField::UINT32;
@@ -195,6 +194,8 @@ TEST(DirectBagTestSuite, test_record_complex_messages)
     rosbag_direct_write::VectorBuffer data(pc2.row_step * pc2.height, 0x20);
     pc2.data.swap(data);
   }
+  // Shouldn't be a multiple of 4096 in order to test odd sized point clouds.
+  EXPECT_NE(pc2.data.size() % 4096, 0);
   __custom_point_stamped imu;
   imu.stamp.fromSec(ros::WallTime::now().toSec());
   imu.x = 1.0;
