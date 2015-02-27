@@ -533,7 +533,8 @@ write_data_message_record_header_with_padding(
   uint32_t conn_id,
   ros::Time const &time,
   size_t current_file_offset,
-  size_t serialized_message_data_len
+  size_t serialized_message_data_len,
+  size_t alignment_adjustment
 )
 {
   ros::M_string header;
@@ -544,7 +545,8 @@ write_data_message_record_header_with_padding(
   size_t projected_offset = current_file_offset
                           + buffer.size()
                           + 4 // length of message data length
-                          + serialized_message_data_len;
+                          + serialized_message_data_len
+                          - alignment_adjustment;
   size_t offset_to_4096_boundary = 4096 - (projected_offset % 4096);
   assert((offset_to_4096_boundary + projected_offset) % 4096 == 0);
   if (offset_to_4096_boundary == 4096)
@@ -650,7 +652,7 @@ DirectBag::write(std::string const& topic, ros::Time const& time, T const& msg,
     // If we are finishing the chunk, pad so that we write to a 4096 boundry
     message_header_len = write_data_message_record_header_with_padding(
         chunk_buffer_, connection_info->id, time, file_->get_offset(),
-        message_data_len);
+        message_data_len, alignment_adjustment<T>());
   }
   else
   {

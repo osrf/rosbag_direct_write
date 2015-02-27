@@ -324,6 +324,13 @@ has_direct_data()
   return false;
 }
 
+/// Default template to allow messages to adjust the alignment padding.
+template<class T> size_t
+alignment_adjustment()
+{
+  return 0;
+}
+
 /// Exception which is raised when a default serialize function is used.
 class not_implemented_exception : public std::logic_error
 {
