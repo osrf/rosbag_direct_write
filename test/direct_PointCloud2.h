@@ -73,7 +73,7 @@ serialize_to_buffer(VectorBuffer& buffer,
       ros::serialization::serialize(*s, msg.height);
       ros::serialization::serialize(*s, msg.width);
       ros::serialization::serialize(*s, msg.fields);
-      ros::serialization::serialize(*s, msg.is_bigendian);
+      ros::serialization::serialize(*s, (uint8_t)msg.is_bigendian);
       ros::serialization::serialize(*s, msg.point_step);
       ros::serialization::serialize(*s, msg.row_step);
       // Write the size of the data which comes next in serialize_to_file
@@ -100,7 +100,7 @@ serialize_to_buffer(VectorBuffer& buffer,
       s.reset(new ros::serialization::OStream(buffer.data() + start_offset,
                                               ser_len));
       // Write out the last item
-      ros::serialization::serialize(*s, msg.is_dense);
+      ros::serialization::serialize(*s, (uint8_t)msg.is_dense);
       return SerializationReturnCode::DONE;
     default:
       // This should not occur
