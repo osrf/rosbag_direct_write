@@ -22,13 +22,15 @@
 	{
 		"sublimeclang_options":
 		[
-			"-I/Users/william/indigo/install/include",
-			"-I${folder:${project_path:rosbag_direct_write.sublime-project}}/include",
-			"-I/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/../include/c++/v1",
+			"-I/usr/include",
 			"-I/usr/local/include",
-			"-I/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/../lib/clang/6.0/include",
-			"-I/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include",
-			"-I/usr/include"
+			"-I${folder:${project_path:rosbag_direct_write.sublime-project}}/include",
+			"-I/Library/Developer/CommandLineTools/usr/bin/../include/c++/v1",
+			"-I/usr/local/include",
+			"-I/Library/Developer/CommandLineTools/usr/bin/../lib/clang/6.1.0/include",
+			"-I/Library/Developer/CommandLineTools/usr/include",
+			"-I/usr/include",
+			"-I/Users/william/indigo/install/include"
 		]
 	}
 }

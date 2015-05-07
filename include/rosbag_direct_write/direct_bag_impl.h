@@ -582,7 +582,7 @@ start_chunk(VectorBuffer &buffer,
   // Initialize chunk info
   chunk_info->pos        = current_file_offset + buffer.size();
   chunk_info->start_time = start_time;
-  chunk_info->end_time   = ros::Time(0);
+  chunk_info->end_time   = start_time;
   // This is a place holder, later we'll create the real one and replace it
   return write_chunk_header(buffer, 0, 0);
 }
@@ -610,6 +610,18 @@ DirectBag::write(std::string const& topic, ros::Time const& time, T const& msg,
     current_chunk_info_.reset(new rosbag::ChunkInfo());
     current_chunk_position_ = chunk_buffer_.size();
     start_chunk(chunk_buffer_, current_chunk_info_, time, file_->get_offset());
+  }
+
+  // Update the start time if needed.
+  if (time < current_chunk_info_->start_time)
+  {
+    current_chunk_info_->start_time = time;
+  }
+
+  // Update the end time if needed.
+  if (time > current_chunk_info_->end_time)
+  {
+    current_chunk_info_->end_time = time;
   }
 
   // Get ID for connection header
