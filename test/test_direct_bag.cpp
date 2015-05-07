@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <geometry_msgs/PointStamped.h>
 // I know this is quite strange, but I need to get to the internals of the
 // rosbag::Bag class to do some easy checking.
-#include <geometry_msgs/PointStamped.h>
 #define private public
 #define protected public
 #include <rosbag/bag.h>
