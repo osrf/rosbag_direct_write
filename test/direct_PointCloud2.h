@@ -4,6 +4,14 @@
 
 #include "rosbag_direct_write/direct_bag.h"
 
+#ifndef STD_MSGS_HEADER
+#define STD_MSGS_HEADER std_msgs::Header
+#endif
+
+#ifndef ROSBAG_DIRECT_WRITE_TEST_ROS_NAMESPACE
+#define ROSBAG_DIRECT_WRITE_TEST_ROS_NAMESPACE ros
+#endif
+
 namespace test_direct_bag
 {
 struct AlignedPointCloud2
