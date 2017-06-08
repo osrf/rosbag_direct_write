@@ -61,7 +61,7 @@ TEST(DirectBagTestSuite, test_record_bag)
     ASSERT_EQ(height, msg->height);
     ASSERT_STREQ("Encoding 1", msg->encoding.c_str());
     ASSERT_TRUE(msg->is_bigendian);
-    ASSERT_EQ(1, msg->step);
+    ASSERT_EQ(1u, msg->step);
     ASSERT_EQ(width * height, msg->data.size());
     for (auto &e : msg->data)
     {
@@ -93,7 +93,7 @@ TEST(DirectBagTestSuite, test_record_bag_small_messages)
   // Read bag with normal rosbag interface
   rosbag::Bag ros_bag;
   ros_bag.open(bag_name, rosbag::bagmode::Read);
-  ASSERT_EQ(ros_bag.chunk_count_, 2);
+  ASSERT_EQ(ros_bag.chunk_count_, 2u);
   std::vector<std::string> topics;
   topics.push_back(std::string("imu"));
   rosbag::View view(ros_bag, rosbag::TopicQuery(topics));
@@ -195,7 +195,7 @@ TEST(DirectBagTestSuite, test_record_complex_messages)
     pc2.data.swap(data);
   }
   // Shouldn't be a multiple of 4096 in order to test odd sized point clouds.
-  EXPECT_NE(pc2.data.size() % 4096, 0);
+  EXPECT_NE(pc2.data.size() % 4096, 0u);
   __custom_point_stamped imu;
   imu.stamp.fromSec(ros::WallTime::now().toSec());
   imu.x = 1.0;
@@ -273,7 +273,7 @@ TEST(DirectBagCollectionTestSuite, test_one_bag)
     bag.write("camera", image.header.stamp, image);
   }
   auto bag_files = bag.close();
-  ASSERT_EQ(bag_files.size(), 1);
+  ASSERT_EQ(bag_files.size(), 1u);
   ASSERT_EQ(bag_files[0], folder_name + '/' + std::string("foo-0001.bag"));
   // Read bag with normal rosbag interface
   std::vector<rosbag_direct_write::shared_ptr<rosbag::Bag>> bags;
@@ -297,7 +297,7 @@ TEST(DirectBagCollectionTestSuite, test_one_bag)
     ASSERT_EQ(height, msg->height);
     ASSERT_STREQ("Encoding 1", msg->encoding.c_str());
     ASSERT_TRUE(msg->is_bigendian);
-    ASSERT_EQ(1, msg->step);
+    ASSERT_EQ(1u, msg->step);
     ASSERT_EQ(width * height, msg->data.size());
     for (auto &e : msg->data)
     {
@@ -342,7 +342,7 @@ TEST(DirectBagCollectionTestSuite, test_open_directory)
     bag.write("camera", image.header.stamp, image);
   }
   auto bag_files = bag.close();
-  ASSERT_EQ(bag_files.size(), 3);  // One bag per image message
+  ASSERT_EQ(bag_files.size(), 3u);  // One bag per image message
   ASSERT_EQ(bag_files[0], folder_name + '/' + std::string("001.bag"));
   // Read bag with normal rosbag interface
   std::vector<rosbag_direct_write::shared_ptr<rosbag::Bag>> bags;
@@ -366,7 +366,7 @@ TEST(DirectBagCollectionTestSuite, test_open_directory)
     ASSERT_EQ(height, msg->height);
     ASSERT_STREQ("Encoding 1", msg->encoding.c_str());
     ASSERT_TRUE(msg->is_bigendian);
-    ASSERT_EQ(1, msg->step);
+    ASSERT_EQ(1u, msg->step);
     ASSERT_EQ(width * height, msg->data.size());
     for (auto &e : msg->data)
     {
@@ -387,7 +387,7 @@ TEST(DirectBagCollectionTestSuite, test_no_messages)
   rosbag_direct_write::DirectBagCollection bag;
   bag.open_directory(folder_name);
   auto bag_files = bag.close();
-  ASSERT_EQ(bag_files.size(), 1);
+  ASSERT_EQ(bag_files.size(), 1u);
   rosbag::Bag ros_bag(bag_files[0], rosbag::bagmode::Read);
   ros_bag.close();
 }

@@ -5,6 +5,9 @@ find_package(catkin REQUIRED COMPONENTS cpp_common rosbag_storage)
 
 catkin_package(CATKIN_DEPENDS cpp_common rosbag_storage)
 
+add_library(${PROJECT_NAME}
+  src/direct_bag.cpp)
+
 if(CATKIN_ENABLE_TESTING)
   find_package(sensor_msgs REQUIRED)
   list(APPEND catkin_LIBRARIES ${sensor_msgs_LIBRARIES})

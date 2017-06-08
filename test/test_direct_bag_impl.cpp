@@ -27,14 +27,14 @@ TEST(DirectBagImplTestSuite, test_to_header_string)
 TEST(DirectBagImplTestSuite, test_write_to_buffer)
 {
   rosbag_direct_write::VectorBuffer buffer({0});
-  ASSERT_EQ(1, buffer.size());
+  ASSERT_EQ(1u, buffer.size());
   // Test implicit size (must be types with .begin and .end functions)
   std::string a("test");
   rosbag_direct_write::VectorBuffer b;
   rosbag_direct_write::impl::write_to_buffer(b, a);
   ASSERT_EQ(rosbag_direct_write::VectorBuffer({'t', 'e', 's', 't'}), b);
   rosbag_direct_write::impl::write_to_buffer(buffer, b);
-  ASSERT_EQ(5, buffer.size());
+  ASSERT_EQ(5u, buffer.size());
   // Test explicit size (implicitly cast to buffer's type)
   uint32_t c = 1;
   rosbag_direct_write::VectorBuffer d;
@@ -42,7 +42,7 @@ TEST(DirectBagImplTestSuite, test_write_to_buffer)
   ASSERT_EQ(rosbag_direct_write::VectorBuffer({0x1, 0x0, 0x0, 0x0}), d);
   // Test pointer version and extending a buffer
   rosbag_direct_write::impl::write_ptr_to_buffer(buffer, &c, 4);
-  ASSERT_EQ(9, buffer.size());
+  ASSERT_EQ(9u, buffer.size());
   rosbag_direct_write::VectorBuffer expected_buffer(
     {0, 't', 'e', 's', 't', 0x1, 0x0, 0x0, 0x0});
   ASSERT_EQ(expected_buffer, buffer);
@@ -126,8 +126,8 @@ TEST(DirectBagImplTestSuite, test_write_file_header_record)
     std::string padding(padding_len, ' ');
     rosbag_direct_write::impl::write_to_buffer(expected, padding);
   }
-  ASSERT_EQ(4096, expected.size());
-  ASSERT_EQ(4096, buffer.size());
+  ASSERT_EQ(4096u, expected.size());
+  ASSERT_EQ(4096u, buffer.size());
   // Compare expected with result
   ASSERT_EQ(expected, buffer);
 }
