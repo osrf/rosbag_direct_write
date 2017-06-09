@@ -26,11 +26,7 @@
 #include <ros/message_traits.h>
 #include <ros/serialization.h>
 
-#pragma GCC diagnostic push
-// There is a warning in rosbag/bag.h about null pointer conversion, ignoring
-#pragma GCC diagnostic ignored "-Wnull-conversion"
 #include <rosbag/bag.h>  // Included for definition of BagMode, nothing else
-#pragma GCC diagnostic pop
 
 #include <rosbag/constants.h>
 #include <rosbag/exceptions.h>

@@ -24,11 +24,7 @@
 
 #include <rosbag/stream.h>  // For CompressionType Enum
 
-#pragma GCC diagnostic push
-// There is a warning in rosbag/bag.h about null pointer conversion, ignoring
-#pragma GCC diagnostic ignored "-Wnull-conversion"
 #include <rosbag/bag.h>
-#pragma GCC diagnostic pop
 
 #define ROSBAG_DIRECT_WRITE_HEADER_BUFFER_TYPE boost::shared_array
 
