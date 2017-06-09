@@ -22,6 +22,8 @@
 #ifndef ROSBAG_BAG_DIRECT_DIRECT_BAG_DEPENDENCIES_H
 #define ROSBAG_BAG_DIRECT_DIRECT_BAG_DEPENDENCIES_H
 
+#include <iostream>
+
 #include <ros/header.h>
 #include <ros/message_traits.h>
 #include <ros/serialization.h>
@@ -33,6 +35,8 @@
 #include <rosbag/structures.h>
 
 #define ROSBAG_DIRECT_WRITE_DECL ROSBAG_DECL
+#define LOG_ERROR std::cerr
+#define CHECK(condition) assert(condition)
 
 namespace rosbag_direct_write {using boost::shared_ptr;}
 

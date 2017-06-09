@@ -18,7 +18,6 @@
 #include <cassert>
 #include <errno.h>
 #include <fcntl.h>
-#include <glog/logging.h>
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
@@ -181,10 +180,10 @@ DirectFile::DirectFile(std::string filename)
     } else {
       // We successfully opened the file, but not in O_DIRECT mode. Continue
       // operation but issue error message.
-      LOG(ERROR)
+      LOG_ERROR
           << "Unable to open bagfile in O_DIRECT mode. This will "
              "negatively impact performance and might make recording data "
-             "impossible.";
+             "impossible.\n";
     }
   }
   file_descriptor_ = fd;
@@ -249,7 +248,7 @@ size_t DirectFile::get_size() const {
   return end_offset;
 }
 
-size_t DirectFile::write_buffer(VectorBuffer &buffer) {
+size_t DirectFile::write_buffer(VectorBuffer& buffer) {
   return this->write_data(buffer.data(), buffer.size());
 }
 
@@ -267,7 +266,7 @@ uint8_t* AllocateAlignedBuffer(size_t buffer_size_bytes) {
 }
 }
 
-size_t DirectFile::write_data(const uint8_t *start, size_t length) {
+size_t DirectFile::write_data(const uint8_t* start, size_t length) {
   size_t current_offset = get_offset();
   CHECK((current_offset % 4096) == 0);
   CHECK((reinterpret_cast<uintptr_t>(start) % 4096) == 0);
@@ -284,7 +283,7 @@ size_t DirectFile::write_data(const uint8_t *start, size_t length) {
     // Bad address. As a fallback solution, write a copy of the data instead.
     // This can work if the original buffer is in the wrong address space.
     uint8_t* data_copy = AllocateAlignedBuffer(length);
-    CHECK_NOTNULL(data_copy);
+    CHECK(data_copy != nullptr);
     memcpy(data_copy, start, length);
     seek(current_offset);
     bytes_written = ::write(file_descriptor_, data_copy, length);
