@@ -5,10 +5,11 @@ find_package(catkin REQUIRED COMPONENTS cpp_common rosbag_storage)
 
 catkin_package(CATKIN_DEPENDS cpp_common rosbag_storage)
 
-include_directories(include)
+include_directories(include ${catkin_INCLUDE_DIRS})
+
 add_library(${PROJECT_NAME}
   src/direct_bag.cpp)
-  
+
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 if(CATKIN_ENABLE_TESTING)
