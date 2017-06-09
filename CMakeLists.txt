@@ -5,6 +5,7 @@ find_package(catkin REQUIRED COMPONENTS cpp_common rosbag_storage)
 
 catkin_package(CATKIN_DEPENDS cpp_common rosbag_storage)
 
+include_directories(include)
 add_library(${PROJECT_NAME}
   src/direct_bag.cpp)
 
