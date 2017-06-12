@@ -30,7 +30,7 @@ namespace rosbag_direct_write
 // Default chunk size.
 static const size_t kdefault_chunk_threshold = 768 * 1024;  // 768KB
 // Default file prefix used in open_directory
-static const std::string kdefault_file_prefix = "";  // No prefix
+static const char* kdefault_file_prefix = "";  // No prefix
 // Default bag size limit in bytes, 2GB is ~73MB less than 2GiB
 static const size_t kdefault_bag_size_threshold = std::pow(10, 9);  // 2GB
 // Default width of bag number suffix

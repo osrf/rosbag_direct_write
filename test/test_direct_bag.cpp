@@ -21,11 +21,14 @@
 #include "custom_image.h"
 #include "custom_point_stamped.h"
 
-TEST(DirectBagTestSuite, test_record_bag)
+class DirectBagTestSuite : public ::testing::TestWithParam<bool> {
+};
+
+TEST_P(DirectBagTestSuite, test_record_bag)
 {
   std::string bag_name = "test_direct.bag";
   // Write a bag with ROS messages
-  rosbag_direct_write::DirectBag bag(bag_name);
+  rosbag_direct_write::DirectBag bag(bag_name, GetParam());
   size_t number_of_iterations = 3;
   size_t width = 1024, height = 768;
   sensor_msgs::Image image;
@@ -73,7 +76,7 @@ TEST(DirectBagTestSuite, test_record_bag)
   ros_bag.close();
 }
 
-TEST(DirectBagTestSuite, test_record_bag_small_messages)
+TEST_P(DirectBagTestSuite, test_record_bag_small_messages)
 {
   std::string bag_name = "test_direct_small_messages.bag";
   // Write a bag with many small ROS messages
@@ -110,7 +113,7 @@ TEST(DirectBagTestSuite, test_record_bag_small_messages)
   ros_bag.close();
 }
 
-TEST(DirectBagTestSuite, test_record_bag_mixed)
+TEST_P(DirectBagTestSuite, test_record_bag_mixed)
 {
   std::string bag_name = "test_direct_mixed.bag";
   // Write a bag with many small ROS messages
@@ -171,10 +174,10 @@ TEST(DirectBagTestSuite, test_record_bag_mixed)
   ros_bag.close();
 }
 
-TEST(DirectBagTestSuite, test_record_complex_messages)
+TEST_P(DirectBagTestSuite, test_record_complex_messages)
 {
   std::string bag_name = "test_direct_complex_messages.bag";
-  rosbag_direct_write::DirectBag bag(bag_name);
+  rosbag_direct_write::DirectBag bag(bag_name, GetParam());
   size_t number_of_iterations = 10;
   size_t number_of_imu_per_iteration = 10;
   test_direct_bag::AlignedPointCloud2 pc2;
@@ -250,11 +253,11 @@ TEST(DirectBagTestSuite, test_record_complex_messages)
   ros_bag.close();
 }
 
-TEST(DirectBagCollectionTestSuite, test_one_bag)
+TEST_P(DirectBagTestSuite, test_one_bag)
 {
   std::string folder_name = "test_one_bag/a/b/c";
   rosbag_direct_write::DirectBagCollection bag;
-  bag.open_directory(folder_name, "foo");
+  bag.open_directory(folder_name, GetParam(), "foo");
   size_t number_of_iterations = 1;
   size_t width = 320, height = 200;
   sensor_msgs::Image image;
@@ -312,12 +315,13 @@ TEST(DirectBagCollectionTestSuite, test_one_bag)
   }
 }
 
-TEST(DirectBagCollectionTestSuite, test_open_directory)
+TEST_P(DirectBagTestSuite, test_open_directory)
 {
   std::string folder_name = "test_open_directory/a/b/c";
   rosbag_direct_write::DirectBagCollection bag;
   bag.open_directory(
     folder_name,  // Folder to put bags in
+    GetParam(),   // O_DIRECT enabled?
     "",           // Prefix for bag file names
     4096,         // 4096KB chunk threshold
     256 * 1024,   // 256KB bag file size threshold
@@ -381,16 +385,23 @@ TEST(DirectBagCollectionTestSuite, test_open_directory)
   }
 }
 
-TEST(DirectBagCollectionTestSuite, test_no_messages)
+TEST_P(DirectBagTestSuite, test_no_messages)
 {
   std::string folder_name = "test_no_messages/a/b/c";
   rosbag_direct_write::DirectBagCollection bag;
-  bag.open_directory(folder_name);
+  bag.open_directory(folder_name, GetParam());
   auto bag_files = bag.close();
   ASSERT_EQ(bag_files.size(), 1u);
   rosbag::Bag ros_bag(bag_files[0], rosbag::bagmode::Read);
   ros_bag.close();
 }
+
+INSTANTIATE_TEST_CASE_P(DirectBagWithODirect,
+                        DirectBagTestSuite,
+                        ::testing::Values(true));
+INSTANTIATE_TEST_CASE_P(DirectBagWithoutODirect,
+                        DirectBagTestSuite,
+                        ::testing::Values(false));
 
 int main(int argc, char **argv)
 {
