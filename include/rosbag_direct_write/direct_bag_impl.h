@@ -249,11 +249,8 @@ write_data_message_record_header(VectorBuffer &buffer,
   return impl::write_header(buffer, header);
 }
 
-static VectorBuffer __temp_constant_buffer;
-static const size_t kchunk_header_length_ = \
-  write_chunk_header(__temp_constant_buffer, 0, 0);
-static const size_t kmessage_header_length_ = \
-  write_data_message_record_header(__temp_constant_buffer, 0, ros::Time(0));
+size_t chunk_header_length();
+size_t chunk_header_length();
 
 inline void
 write_index_records(
@@ -377,51 +374,16 @@ DirectBag::get_connection_info(std::string const &topic,
   return connection_info;
 }
 
-inline size_t
-write_data_message_record_header_with_padding(
+size_t write_data_message_record_header_with_padding(
   VectorBuffer &buffer,
   uint32_t conn_id,
   ros::Time const &time,
   size_t current_file_offset,
   size_t serialized_message_data_len,
   size_t alignment_adjustment
-)
-{
-  ros::M_string header;
-  generate_message_record_header(conn_id, time, header);
-  size_t buffer_starting_offset = buffer.size();
-  // Write header
-  size_t header_len = impl::write_header(buffer, header);
-  size_t projected_offset = current_file_offset
-                          + buffer.size()
-                          + 4 // length of message data length
-                          + serialized_message_data_len
-                          - alignment_adjustment;
-  size_t offset_to_4096_boundary = 4096 - (projected_offset % 4096);
-  assert((offset_to_4096_boundary + projected_offset) % 4096 == 0);
-  if (offset_to_4096_boundary == 4096)
-  {
-    // No alignment needed
-    return header_len;
-  }
-  if (offset_to_4096_boundary < 7)
-  {
-    // Add 4096, since we need at least 7 char's to do the padding
-    offset_to_4096_boundary += 4096;
-  }
-  impl::write_to_buffer(buffer, offset_to_4096_boundary - 4, 4);
-  impl::write_to_buffer(buffer, "_=", 2);
-  // Offset to achieve, minus len of padding, minus `_=`
-  size_t number_of_pads = offset_to_4096_boundary - 4 - 2;
-  buffer.resize(buffer.size() + number_of_pads, ' ');
-  // Update the header len
-  header_len += offset_to_4096_boundary;
-  VectorBuffer temp;
-  impl::write_to_buffer(temp, header_len, 4);
-  std::copy(temp.begin(), temp.end(), buffer.begin() + buffer_starting_offset);
-  // Return the new length
-  return header_len;
-}
+);
+size_t chunk_header_length();
+size_t message_header_length();
 
 size_t inline start_chunk(VectorBuffer &buffer,
                           shared_ptr<rosbag::ChunkInfo> &chunk_info,
@@ -493,7 +455,7 @@ DirectBag::write(std::string const& topic, ros::Time const& time, T const& msg,
     // Start with the current size of the chunk
     size_t est_chunk_size = chunk_buffer_.size() - current_chunk_position_;
     // Add the size of the data message recored header
-    est_chunk_size += kmessage_header_length_;
+    est_chunk_size += message_header_length();
     // Add the size of the message data length number
     est_chunk_size += 4;
     // Add the length of the message data
@@ -535,7 +497,7 @@ DirectBag::write(std::string const& topic, ros::Time const& time, T const& msg,
   index_entry.offset   -= current_chunk_info_->pos;
   // Adjust for the chunk header
   index_entry.offset   -= 4;  // Length of the header
-  index_entry.offset   -= kchunk_header_length_;
+  index_entry.offset   -= chunk_header_length();
   // Adjust for the message header
   index_entry.offset   -= 4;  // Length of the header
   index_entry.offset   -= message_header_len;
@@ -572,7 +534,7 @@ DirectBag::write(std::string const& topic, ros::Time const& time, T const& msg,
     //   Adjust for the position of the chunk in the file
     chunk_size -= current_chunk_info_->pos;
     //   Adjust for chunk header's length
-    chunk_size -= kchunk_header_length_;
+    chunk_size -= chunk_header_length();
     //   Adjust for length values of the header and the data
     chunk_size -= 4;
     chunk_size -= 4;
