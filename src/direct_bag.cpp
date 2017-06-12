@@ -32,9 +32,10 @@ using rosbag::compression::CompressionType;
 using namespace rosbag;
 using std::string;
 
-DirectBag::DirectBag(std::string filename, size_t chunk_threshold)
+DirectBag::DirectBag(std::string filename, bool use_odirect,
+                     size_t chunk_threshold)
     : DirectBag() {
-  this->open(filename, chunk_threshold);
+  this->open(filename, use_odirect, chunk_threshold);
 }
 
 DirectBag::DirectBag()
@@ -45,12 +46,13 @@ DirectBag::DirectBag()
       chunk_threshold_(kdefault_chunk_threshold),
       next_conn_id_(0) {}
 
-void DirectBag::open(std::string filename, size_t chunk_threshold) {
+void DirectBag::open(std::string filename, bool use_odirect,
+                     size_t chunk_threshold) {
   if (this->is_open()) {
     throw std::runtime_error(
         "open called on an already open DirectBag instance.");
   }
-  file_.reset(new DirectFile(filename));
+  file_.reset(new DirectFile(filename, use_odirect));
   filename_ = filename;
   chunk_threshold_ = chunk_threshold;
   VectorBuffer start_buffer;
@@ -150,7 +152,7 @@ size_t DirectBag::get_virtual_bag_size() const {
   return file_->get_offset() + chunk_buffer_.size();
 }
 
-DirectFile::DirectFile(std::string filename)
+DirectFile::DirectFile(std::string filename, bool use_odirect)
     : filename_(filename), open_(true) {
 #ifdef __APPLE__
   file_pointer_ = fopen(filename.c_str(), "w+b");
@@ -166,25 +168,17 @@ DirectFile::DirectFile(std::string filename)
     throw BagFileException("Failed to set F_NOCACHE", errno);
   }
 #else
-  constexpr int flags = O_CREAT | O_RDWR | O_TRUNC;
+  int flags = O_CREAT | O_RDWR | O_TRUNC;
   constexpr int mode =
       S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH;
+  if (use_odirect) {
+    flags = flags | O_DIRECT;
+  }
   // Try to open in O_DIRECT mode.
-  int fd = open(filename.c_str(), flags | O_DIRECT, mode);
+  int fd = open(filename.c_str(), flags, mode);
   if (fd < 0) {
-    // Open failed, try to open without O_DIRECT.
-    fd = open(filename.c_str(), flags, mode);
-    if (fd < 0) {
-      throw BagFileException(std::string("Failed to open file: ") + filename,
-                             errno);
-    } else {
-      // We successfully opened the file, but not in O_DIRECT mode. Continue
-      // operation but issue error message.
-      LOG_ERROR
-          << "Unable to open bagfile in O_DIRECT mode. This will "
-             "negatively impact performance and might make recording data "
-             "impossible.\n";
-    }
+    throw BagFileException(std::string("Failed to open file: ") + filename,
+                           errno);
   }
   file_descriptor_ = fd;
 #endif
@@ -268,9 +262,9 @@ uint8_t* AllocateAlignedBuffer(size_t buffer_size_bytes) {
 
 size_t DirectFile::write_data(const uint8_t* start, size_t length) {
   size_t current_offset = get_offset();
-  CHECK((current_offset % 4096) == 0);
-  CHECK((reinterpret_cast<uintptr_t>(start) % 4096) == 0);
-  CHECK((length % 4096) == 0);
+  assert((current_offset % 4096) == 0);
+  assert((reinterpret_cast<uintptr_t>(start) % 4096) == 0);
+  assert((length % 4096) == 0);
 #if __APPLE__
   ssize_t ret = fwrite(start, sizeof(uint8_t), length, file_pointer_);
   if (ret < 0) {
@@ -283,7 +277,7 @@ size_t DirectFile::write_data(const uint8_t* start, size_t length) {
     // Bad address. As a fallback solution, write a copy of the data instead.
     // This can work if the original buffer is in the wrong address space.
     uint8_t* data_copy = AllocateAlignedBuffer(length);
-    CHECK(data_copy != nullptr);
+    assert(data_copy != nullptr);
     memcpy(data_copy, start, length);
     seek(current_offset);
     bytes_written = ::write(file_descriptor_, data_copy, length);
@@ -302,6 +296,7 @@ DirectBagCollection::DirectBagCollection()
       chunk_threshold_(0),
       bag_size_threshold_(0),
       bag_number_width_(0),
+      use_odirect_(true),
       open_(false),
       current_bag_number_(0),
       current_bag_(nullptr) {}
@@ -339,6 +334,7 @@ std::vector<std::string> DirectBagCollection::close() {
 }
 
 void DirectBagCollection::open_directory(std::string folder_path,
+                                         bool use_odirect,
                                          std::string file_prefix,
                                          size_t chunk_threshold,
                                          size_t bag_size_threshold,
@@ -347,6 +343,7 @@ void DirectBagCollection::open_directory(std::string folder_path,
     throw std::runtime_error(
         "open called on an already open DirectBagCollection instance.");
   }
+  use_odirect_ = use_odirect;
   folder_path_ = folder_path;
   file_prefix_ = file_prefix;
   chunk_threshold_ = chunk_threshold;
@@ -412,7 +409,7 @@ void DirectBagCollection::open_next_bag_() {
   current_bag_.reset(
       new DirectBag(generate_bag_name(folder_path_, file_prefix_,
                                       ++current_bag_number_, bag_number_width_),
-                    chunk_threshold_));
+                    use_odirect_, chunk_threshold_));
 }
 
 } /* namespace rosbag_direct_write */
