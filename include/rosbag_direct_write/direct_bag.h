@@ -30,7 +30,7 @@ namespace rosbag_direct_write
 // Default chunk size.
 static const size_t kdefault_chunk_threshold = 768 * 1024;  // 768KB
 // Default file prefix used in open_directory
-static const std::string kdefault_file_prefix = "";  // No prefix
+static const char* kdefault_file_prefix = "";  // No prefix
 // Default bag size limit in bytes, 2GB is ~73MB less than 2GiB
 static const size_t kdefault_bag_size_threshold = std::pow(10, 9);  // 2GB
 // Default width of bag number suffix
@@ -49,7 +49,7 @@ class ROSBAG_DIRECT_WRITE_DECL DirectFile
 {
 public:
   /// Opens the given file with O_DIRECT, overwriting an existing file.
-  DirectFile(std::string filename);
+  DirectFile(std::string filename, bool use_odirect);
   ~DirectFile();
 
   /// Returns the cursor location as a number of bytes from the file start.
@@ -91,7 +91,7 @@ class ROSBAG_DIRECT_WRITE_DECL DirectBag
 {
 public:
   /// Creates a new ROS bag file, overwriting an existing one.
-  DirectBag(std::string filename,
+  DirectBag(std::string filename, bool use_odirect,
             size_t chunk_threshold=kdefault_chunk_threshold);
   /// Creates an uninitialized DirectBag; open must be called before use.
   DirectBag();
@@ -118,7 +118,7 @@ public:
    * @param chunk_threshold The size at which chunks are closed,
    *                        defaults to 768kb.
    */
-  void open(std::string filename,
+  void open(std::string filename, bool use_odirect,
             size_t chunk_threshold=kdefault_chunk_threshold);
 
   /// Writes a given data structure to the bag file.
@@ -270,6 +270,7 @@ public:
    * @throw std::invalid_argument If the bag_number_width is zero.
    */
   void open_directory(std::string folder_path,
+                      bool use_odirect,
                       std::string file_prefix=kdefault_file_prefix,
                       size_t chunk_threshold=kdefault_chunk_threshold,
                       size_t bag_size_threshold=kdefault_bag_size_threshold,
@@ -308,6 +309,7 @@ private:
   size_t chunk_threshold_;
   size_t bag_size_threshold_;
   size_t bag_number_width_;
+  bool use_odirect_;
 
   std::atomic<bool> open_;
   size_t current_bag_number_;
