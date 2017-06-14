@@ -249,9 +249,6 @@ write_data_message_record_header(VectorBuffer &buffer,
   return impl::write_header(buffer, header);
 }
 
-size_t chunk_header_length();
-size_t chunk_header_length();
-
 inline void
 write_index_records(
   VectorBuffer &buffer,
