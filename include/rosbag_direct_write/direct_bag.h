@@ -81,7 +81,7 @@ private:
   int file_descriptor_;
 #endif
   bool open_;
-
+  bool use_odirect_;
 };
 
 /// The DirectBag class provides an interface for writing ROS messages or
@@ -312,7 +312,6 @@ private:
   bool use_odirect_;
 
   std::atomic<bool> open_;
-  bool use_odirect_;
   size_t current_bag_number_;
   shared_ptr<DirectBag> current_bag_;
 };
