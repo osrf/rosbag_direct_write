@@ -211,7 +211,7 @@ size_t DirectBag::get_virtual_bag_size() const {
 }
 
 DirectFile::DirectFile(std::string filename, bool use_odirect)
-    : filename_(filename), open_(true) {
+    : filename_(filename), open_(true), use_odirect_(use_odirect) {
 #ifdef __APPLE__
   file_pointer_ = fopen(filename.c_str(), "w+b");
   if (file_pointer_ == nullptr) {
@@ -320,9 +320,11 @@ uint8_t* AllocateAlignedBuffer(size_t buffer_size_bytes) {
 
 size_t DirectFile::write_data(const uint8_t* start, size_t length) {
   size_t current_offset = get_offset();
-  assert((current_offset % 4096) == 0);
-  assert((reinterpret_cast<uintptr_t>(start) % 4096) == 0);
-  assert((length % 4096) == 0);
+  if (use_odirect_) {
+    assert((current_offset % 4096) == 0);
+    assert((reinterpret_cast<uintptr_t>(start) % 4096) == 0);
+    assert((length % 4096) == 0);
+  }
 #if __APPLE__
   ssize_t ret = fwrite(start, sizeof(uint8_t), length, file_pointer_);
   if (ret < 0) {

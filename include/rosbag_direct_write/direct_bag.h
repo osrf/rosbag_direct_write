@@ -81,7 +81,7 @@ private:
   int file_descriptor_;
 #endif
   bool open_;
-
+  bool use_odirect_;
 };
 
 /// The DirectBag class provides an interface for writing ROS messages or
