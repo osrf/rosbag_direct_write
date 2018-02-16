@@ -3,7 +3,11 @@ project(rosbag_direct_write)
 
 find_package(catkin REQUIRED COMPONENTS cpp_common rosbag_storage)
 
-catkin_package(CATKIN_DEPENDS cpp_common rosbag_storage)
+catkin_package(
+	INCLUDE_DIRS include
+	CATKIN_DEPENDS cpp_common rosbag_storage
+	LIBRARIES rosbag_direct_write
+)
 
 include_directories(include ${catkin_INCLUDE_DIRS})
 
